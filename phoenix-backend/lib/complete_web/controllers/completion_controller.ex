@@ -17,15 +17,20 @@ defmodule CompleteWeb.CompletionController do
         max_tokens: params["max_tokens"]
       }
 
-      %{completion: completion, finish_reason: reason, model: model} =
-        Complete.CompletionGateway.generate(request)
+      case Complete.CompletionGateway.generate(request) do
+        %{finish_reason: "error"} ->
+          conn
+          |> put_status(:bad_gateway)
+          |> json(%{error: %{code: "upstream_error", message: "inference provider failed"}})
 
-      json(conn, %{
-        request_id: request.request_id,
-        completion: completion,
-        finish_reason: reason,
-        model: model
-      })
+        %{completion: completion, finish_reason: reason, model: model} ->
+          json(conn, %{
+            request_id: request.request_id,
+            completion: completion,
+            finish_reason: reason,
+            model: model
+          })
+      end
     else
       {:error, status, code, message} ->
         conn

@@ -39,7 +39,8 @@ defmodule Complete.MixProject do
       {:phoenix, "~> 1.7"},
       {:bandit, "~> 1.5"},
       {:jason, "~> 1.4"},
-      {:finch, "~> 0.19"}
+      {:finch, "~> 0.19"},
+      {:bypass, "~> 2.1", only: :test}
     ]
   end
 

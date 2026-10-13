@@ -1,17 +1,41 @@
 defmodule Complete.CompletionGateway do
   @moduledoc """
-  Single entry point for completion inference. Phase 1 delegates to
-  `Complete.MockProvider`; Phase 3 will route to a real HTTP adapter
-  (via `Complete.Finch`) behind this same function. Callers should not
-  call providers directly.
+  Single entry point for completion inference. Provider selection:
+
+    * `INFERENCE_BASE_URL` set (via `config :complete, :inference`) →
+      `Complete.FimAdapter` (real upstream HTTP).
+    * otherwise → `Complete.MockProvider` (Phase 1 deterministic mock).
+
+  Callers (i.e. the controller) never pick a provider and never change
+  between phases; only this module routes.
   """
 
-  @doc """
-  `request` is a validated map with atom keys:
-  `:request_id, :language, :file_path, :prefix, :suffix,
-   :repository_context, :max_tokens`.
+  @type request :: %{
+          request_id: String.t(),
+          language: String.t(),
+          file_path: String.t(),
+          prefix: String.t(),
+          suffix: String.t(),
+          repository_context: String.t(),
+          max_tokens: pos_integer()
+        }
 
-  Returns `%{completion: binary, finish_reason: binary, model: binary}`.
-  """
-  def generate(request), do: Complete.MockProvider.generate(request)
+  @type result :: %{
+          completion: String.t(),
+          finish_reason: String.t(),
+          model: String.t()
+        }
+
+  @doc "Returns `%{completion, finish_reason, model}` for a validated request map."
+  def generate(request) do
+    provider().generate(request)
+  end
+
+  defp provider do
+    if Application.get_env(:complete, :inference) do
+      Complete.FimAdapter
+    else
+      Complete.MockProvider
+    end
+  end
 end

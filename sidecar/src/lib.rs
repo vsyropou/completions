@@ -1,6 +1,9 @@
 pub mod completion;
+pub mod context;
 pub mod documents;
+pub mod index;
 pub mod rpc;
+pub mod syntax;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -69,6 +72,7 @@ struct Pending {
 pub async fn run() {
     let config = Config::default();
     let documents: Documents = Documents::default();
+    let index = index::Index::default();
     let pending = Arc::new(Pending {
         cancel: Mutex::new(HashMap::new()),
         answered: Mutex::new(std::collections::HashSet::new()),
@@ -120,7 +124,7 @@ pub async fn run() {
 
         match (method.as_str(), id) {
             ("initialize", Some(id)) => {
-                let resp = match handle_initialize(&config, &val).await {
+                let resp = match handle_initialize(&config, &val, &index).await {
                     Ok(v) => rpc::success_response(id, v),
                     Err(e) => e.into_response(id),
                 };
@@ -135,6 +139,7 @@ pub async fn run() {
             ("completion/request", Some(id)) => {
                 let cfg = config.clone();
                 let docs = documents.clone();
+                let idx = index.clone();
                 let pnd = pending.clone();
                 let w = writer.clone();
                 let num_id = match &id {
@@ -143,7 +148,7 @@ pub async fn run() {
                 };
                 let task_id = id.clone();
                 let task = tokio::spawn(async move {
-                    let result = completion::handle_completion_request(cfg, docs, val).await;
+                    let result = completion::handle_completion_request(cfg, docs, idx, val).await;
                     // If id was cancelled while we worked, skip responding (already answered -32003).
                     if let Some(n) = num_id {
                         if pnd.answered.lock().await.contains(&n) {
@@ -187,11 +192,13 @@ pub async fn run() {
                 documents
                     .did_open(val.get("params").unwrap_or(&serde_json::Value::Null))
                     .await;
+                refresh_index_for_doc(&index, &config, val.get("params")).await;
             }
             ("textDocument/didChange", None) => {
                 documents
                     .did_change(val.get("params").unwrap_or(&serde_json::Value::Null))
                     .await;
+                refresh_index_for_doc(&index, &config, val.get("params")).await;
             }
             ("textDocument/didClose", None) => {
                 documents
@@ -219,6 +226,7 @@ async fn write_err(writer: &Arc<Mutex<tokio::io::Stdout>>, id: RequestId, e: Jso
 async fn handle_initialize(
     cfg: &Config,
     val: &serde_json::Value,
+    index: &index::Index,
 ) -> Result<serde_json::Value, JsonRpcError> {
     let params = val
         .get("params")
@@ -244,11 +252,73 @@ async fn handle_initialize(
         .map(|v| v as u32)
         .unwrap_or(128);
 
-    let mut g = cfg.inner.lock().await;
-    g.phoenix_url = phoenix_url;
-    g.auth_token = auth_token;
-    g.workspace_root = workspace_root;
-    g.max_tokens_default = max_tokens;
+    {
+        let mut g = cfg.inner.lock().await;
+        g.phoenix_url = phoenix_url;
+        g.auth_token = auth_token;
+        g.workspace_root = workspace_root.clone();
+        g.max_tokens_default = max_tokens;
+    }
+
+    // Spawn async workspace indexing — never block completions on it.
+    if let Some(root) = workspace_root_to_path(&workspace_root) {
+        let idx = index.clone();
+        tokio::spawn(async move {
+            let n_before = idx.all_paths().await.len();
+            index::build_index(root, idx.clone()).await;
+            let n_after = idx.all_paths().await.len();
+            tracing::info!(files = n_after - n_before, "workspace indexed");
+        });
+    }
 
     Ok(serde_json::json!({ "capabilities": { "languages": ["typescript", "tsx"] } }))
+}
+
+fn workspace_root_to_path(root: &str) -> Option<std::path::PathBuf> {
+    let p = root.strip_prefix("file://").unwrap_or(root);
+    if p.is_empty() {
+        None
+    } else {
+        Some(std::path::PathBuf::from(p))
+    }
+}
+
+/// Re-extract symbols/imports for a single open document so completions see fresh state.
+async fn refresh_index_for_doc(
+    index: &index::Index,
+    config: &Config,
+    params: Option<&serde_json::Value>,
+) {
+    let Some(p) = params else { return };
+    let Some(uri) = p.get("uri").and_then(|v| v.as_str()) else {
+        return;
+    };
+    let Some(text) = p.get("text").and_then(|v| v.as_str()) else {
+        return;
+    };
+    let lang_id = p
+        .get("language")
+        .and_then(|v| v.as_str())
+        .unwrap_or("typescript");
+    let workspace_root = config.inner.lock().await.workspace_root.clone();
+    let rel = repo_relative_str(&workspace_root, uri);
+    let Some(tree) = syntax::parse(syntax::Lang::from_language_id(lang_id), text) else {
+        return;
+    };
+    let (symbols, imports_strs) = index::extract(&tree, text);
+    // extract() returns resolved import strings (module specifiers), but our Index expects specifiers as-written.
+    index
+        .set_file(std::path::PathBuf::from(&rel), symbols, imports_strs)
+        .await;
+}
+
+pub fn repo_relative_str(workspace_root: &str, uri: &str) -> String {
+    if !workspace_root.is_empty() {
+        if let Some(stripped) = uri.strip_prefix(workspace_root) {
+            return stripped.trim_start_matches('/').to_owned();
+        }
+    }
+    uri.strip_prefix("file://")
+        .map(|s| s.trim_start_matches('/').to_owned())
+        .unwrap_or_else(|| uri.to_owned())
 }

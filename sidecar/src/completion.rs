@@ -90,6 +90,7 @@ pub fn cap_prefix(s: &str, max: usize) -> &str {
 pub async fn handle_completion_request(
     cfg: crate::Config,
     documents: crate::documents::Documents,
+    index: crate::index::Index,
     req: serde_json::Value,
 ) -> Result<serde_json::Value, JsonRpcError> {
     let params_value = req
@@ -118,7 +119,17 @@ pub async fn handle_completion_request(
     let (phoenix_url, auth_token, workspace_root, default_max_tokens, http) = cfg.snapshot().await;
     let max_tokens = p.max_tokens.unwrap_or(default_max_tokens);
     let request_id = uuid::Uuid::new_v4().to_string();
-    let file_path = repo_relative(&workspace_root, &p.document_uri);
+    let file_path = crate::repo_relative_str(&workspace_root, &p.document_uri);
+
+    // Phase 2: build repository_context from tree-sitter + in-memory index.
+    let lang = crate::syntax::Lang::from_language_id(&doc.language);
+    let repository_context = match crate::syntax::parse(lang, &doc.text) {
+        Some(tree) => {
+            crate::context::build_repository_context(&index, &file_path, &tree, &doc.text, offset)
+                .await
+        }
+        None => String::new(),
+    };
 
     let url = format!("{}/api/v1/completions", phoenix_url.trim_end_matches('/'));
     let body = json!({
@@ -127,7 +138,7 @@ pub async fn handle_completion_request(
         "file_path": file_path,
         "prefix": prefix,
         "suffix": suffix,
-        "repository_context": "",
+        "repository_context": repository_context,
         "max_tokens": max_tokens,
     });
 
@@ -162,18 +173,6 @@ pub async fn handle_completion_request(
         "text": completion,
         "document_version": doc.version,
     }))
-}
-
-fn repo_relative(workspace_root: &str, uri: &str) -> String {
-    let stripped = uri
-        .strip_prefix(workspace_root)
-        .map(|s| s.trim_start_matches('/'))
-        .unwrap_or(uri);
-    stripped
-        .strip_prefix("file://")
-        .map(|s| s.trim_start_matches('/'))
-        .unwrap_or(stripped)
-        .to_owned()
 }
 
 #[cfg(test)]
@@ -262,7 +261,7 @@ mod tests {
 
         let cfg = mock_config(format!("http://{addr}")).await;
         let docs = open_documents().await;
-        let res = handle_completion_request(cfg, docs, open_doc())
+        let res = handle_completion_request(cfg, docs, crate::index::Index::default(), open_doc())
             .await
             .unwrap();
         assert_eq!(res["text"], "  return 42;\n");
@@ -293,7 +292,7 @@ mod tests {
 
         let cfg = mock_config(format!("http://{addr}")).await;
         let docs = open_documents().await;
-        let err = handle_completion_request(cfg, docs, open_doc())
+        let err = handle_completion_request(cfg, docs, crate::index::Index::default(), open_doc())
             .await
             .unwrap_err();
         assert_eq!(err.code, -32002, "got: {:?}", err);
@@ -306,7 +305,9 @@ mod tests {
         let docs = open_documents().await;
         let mut req = open_doc();
         req["params"]["document_version"] = serde_json::json!(99);
-        let err = handle_completion_request(cfg, docs, req).await.unwrap_err();
+        let err = handle_completion_request(cfg, docs, crate::index::Index::default(), req)
+            .await
+            .unwrap_err();
         assert_eq!(err.code, -32001);
     }
 
@@ -314,7 +315,7 @@ mod tests {
     async fn unknown_document_returns_32000() {
         let cfg = mock_config("http://127.0.0.1:1".into()).await;
         let docs = crate::documents::Documents::default();
-        let err = handle_completion_request(cfg, docs, open_doc())
+        let err = handle_completion_request(cfg, docs, crate::index::Index::default(), open_doc())
             .await
             .unwrap_err();
         assert_eq!(err.code, -32000);

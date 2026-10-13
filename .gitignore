@@ -1,0 +1,6 @@
+node_modules/
+out/
+target/
+_build/
+deps/
+*.vsix

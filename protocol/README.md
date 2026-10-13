@@ -242,7 +242,7 @@ Error responses — consistent shape, JSON body:
 
 - `position.line`: zero-based line.
 - `position.character`: zero-based **UTF-16 code unit** offset within the line.
-- Rust converts to a UTF-8 byte offset before slicing. Rust must handle multi-byte characters and surrogate pairs correctly (a UTF-16 `character` may point mid-surrogate — treat a trailing-surrogate position as the boundary before the pair).
+- Rust converts to a UTF-8 byte offset before slicing. Rust must handle multi-byte characters and surrogate pairs correctly. If a UTF-16 `character` lands mid-surrogate-pair (i.e. between the high and low halves), the position resolves to the boundary **before** the pair.
 - A completion response is valid only if `document_version` in the response equals the document's current version in the extension. Otherwise the extension discards it.
 
 ---

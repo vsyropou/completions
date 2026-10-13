@@ -1,0 +1,50 @@
+{
+  "name": "completion",
+  "displayName": "Completion",
+  "description": "Low-latency multiline code completion",
+  "version": "0.0.1",
+  "publisher": "local",
+  "engines": { "vscode": "^1.85.0" },
+  "activationEvents": [
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Completion",
+      "properties": {
+        "completion.sidecarPath": {
+          "type": "string",
+          "default": "",
+          "description": "Override sidecar binary path (dev use)"
+        },
+        "completion.phoenixUrl": {
+          "type": "string",
+          "default": "http://localhost:4000",
+          "description": "Phoenix backend URL"
+        },
+        "completion.authToken": {
+          "type": "string",
+          "default": "dev-token",
+          "description": "Phoenix bearer token"
+        },
+        "completion.maxTokens": {
+          "type": "number",
+          "default": 128,
+          "description": "Max tokens per completion"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test:unit": "node --test test/*.test.js",
+    "test": "npm run compile && npm run test:unit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}

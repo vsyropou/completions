@@ -33,6 +33,11 @@
           "type": "number",
           "default": 128,
           "description": "Max tokens per completion"
+        },
+        "completion.measureLatency": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log per-request latency breakdown to the output channel"
         }
       }
     }

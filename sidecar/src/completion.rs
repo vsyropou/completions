@@ -93,6 +93,7 @@ pub async fn handle_completion_request(
     index: crate::index::Index,
     req: serde_json::Value,
 ) -> Result<serde_json::Value, JsonRpcError> {
+    let t0 = std::time::Instant::now();
     let params_value = req
         .get("params")
         .cloned()
@@ -116,7 +117,8 @@ pub async fn handle_completion_request(
     let prefix = cap_prefix(&doc.text[..offset], PREFIX_CAP).to_owned();
     let suffix = cap_suffix(&doc.text[offset..], SUFFIX_CAP).to_owned();
 
-    let (phoenix_url, auth_token, workspace_root, default_max_tokens, http) = cfg.snapshot().await;
+    let (phoenix_url, auth_token, workspace_root, default_max_tokens, measure_latency, http) =
+        cfg.snapshot().await;
     let max_tokens = p.max_tokens.unwrap_or(default_max_tokens);
     let request_id = uuid::Uuid::new_v4().to_string();
     let file_path = crate::repo_relative_str(&workspace_root, &p.document_uri);
@@ -142,6 +144,7 @@ pub async fn handle_completion_request(
         "max_tokens": max_tokens,
     });
 
+    let http_start = std::time::Instant::now();
     let resp = http
         .post(&url)
         .bearer_auth(&auth_token)
@@ -164,15 +167,24 @@ pub async fn handle_completion_request(
         .json()
         .await
         .map_err(|e| JsonRpcError::upstream(format!("invalid phoenix json: {e}")))?;
+    let http_ms = http_start.elapsed().as_millis() as u64;
     let completion = v
         .get("completion")
         .and_then(|c| c.as_str())
         .ok_or_else(|| JsonRpcError::upstream("phoenix response missing 'completion'"))?;
 
-    Ok(json!({
+    let mut out = json!({
         "text": completion,
         "document_version": doc.version,
-    }))
+    });
+    if measure_latency {
+        let total_ms = t0.elapsed().as_millis() as u64;
+        out.as_object_mut().unwrap().insert(
+            "latency_ms".to_string(),
+            json!({ "total": total_ms, "http": http_ms }),
+        );
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -281,6 +293,39 @@ mod tests {
         assert!(body.contains("\"max_tokens\":64"));
         assert!(body.contains("\"repository_context\":\"\""));
         assert!(body.contains("authorization: Bearer tok"));
+    }
+
+    #[tokio::test]
+    async fn latency_ms_present_when_opted_in() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let reply = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 86\r\nConnection: close\r\n\r\n{\"request_id\":\"x\",\"completion\":\"  return 42;\\n\",\"finish_reason\":\"stop\",\"model\":\"mock\"}";
+        let server = tokio::spawn(serve_once(listener, reply));
+
+        let cfg = mock_config(format!("http://{addr}")).await;
+        cfg.inner.lock().await.measure_latency = true;
+        let docs = open_documents().await;
+        let res = handle_completion_request(cfg, docs, crate::index::Index::default(), open_doc())
+            .await
+            .unwrap();
+        let lm = res["latency_ms"].as_object().expect("latency_ms present");
+        let total = lm["total"].as_u64().unwrap();
+        let http = lm["http"].as_u64().unwrap();
+        assert!(total >= http, "total={} http={}", total, http);
+
+        // Opt-in default false: same request without the flag yields no key.
+        let listener2 = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr2 = listener2.local_addr().unwrap();
+        let server2 = tokio::spawn(serve_once(listener2, reply));
+        let cfg2 = mock_config(format!("http://{addr2}")).await;
+        let docs2 = open_documents().await;
+        let res2 =
+            handle_completion_request(cfg2, docs2, crate::index::Index::default(), open_doc())
+                .await
+                .unwrap();
+        assert!(res2.get("latency_ms").is_none());
+        server.await.unwrap();
+        server2.await.unwrap();
     }
 
     #[tokio::test]

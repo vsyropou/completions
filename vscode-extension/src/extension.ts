@@ -169,6 +169,7 @@ async function initializeAndSync() {
         phoenix_url: cfg.get<string>("phoenixUrl"),
         auth_token: cfg.get<string>("authToken"),
         max_tokens: cfg.get<number>("maxTokens"),
+        measure_latency: cfg.get<boolean>("measureLatency"),
       },
       REQUEST_TIMEOUT_MS
     );
@@ -216,6 +217,7 @@ async function provideInlineCompletionItems(
 ): Promise<vscode.InlineCompletionItem[]> {
   if (!child || !languageOf(doc)) return [];
   const id = nextId;
+  const startedAt = Date.now();
   const cancelSub = token.onCancellationRequested(() => {
     sendNotification("completion/cancel", { request_id: id });
   });
@@ -234,7 +236,12 @@ async function provideInlineCompletionItems(
       new Promise<never>((_, reject) => {
         token.onCancellationRequested(() => reject(new Error("cancelled")));
       }),
-    ])) as { text: string; document_version: number };
+    ])) as { text: string; document_version: number; latency_ms?: { total: number; http: number } };
+    if (config().get<boolean>("measureLatency") && result.latency_ms) {
+      output.appendLine(
+        `[latency] total=${Date.now() - startedAt}ms rust_total=${result.latency_ms.total}ms rust_http=${result.latency_ms.http}ms`
+      );
+    }
     // Stale check: document moved on, or editor switched away.
     if (result.document_version !== doc.version) return [];
     if (vscode.window.activeTextEditor?.document.uri.toString() !== doc.uri.toString()) return [];

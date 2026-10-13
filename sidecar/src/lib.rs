@@ -23,6 +23,7 @@ pub struct Inner {
     pub auth_token: String,
     pub workspace_root: String,
     pub max_tokens_default: u32,
+    pub measure_latency: bool,
     pub http: reqwest::Client,
 }
 
@@ -39,6 +40,7 @@ impl Default for Config {
                 auth_token: String::new(),
                 workspace_root: String::new(),
                 max_tokens_default: 128,
+                measure_latency: false,
                 http,
             })),
         }
@@ -47,13 +49,14 @@ impl Default for Config {
 
 impl Config {
     /// Take a snapshot of the config needed for one HTTP call.
-    pub async fn snapshot(&self) -> (String, String, String, u32, reqwest::Client) {
+    pub async fn snapshot(&self) -> (String, String, String, u32, bool, reqwest::Client) {
         let g = self.inner.lock().await;
         (
             g.phoenix_url.clone(),
             g.auth_token.clone(),
             g.workspace_root.clone(),
             g.max_tokens_default,
+            g.measure_latency,
             g.http.clone(),
         )
     }
@@ -251,6 +254,10 @@ async fn handle_initialize(
         .and_then(|v| v.as_u64())
         .map(|v| v as u32)
         .unwrap_or(128);
+    let measure_latency = params
+        .get("measure_latency")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     {
         let mut g = cfg.inner.lock().await;
@@ -258,6 +265,7 @@ async fn handle_initialize(
         g.auth_token = auth_token;
         g.workspace_root = workspace_root.clone();
         g.max_tokens_default = max_tokens;
+        g.measure_latency = measure_latency;
     }
 
     // Spawn async workspace indexing — never block completions on it.

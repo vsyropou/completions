@@ -65,11 +65,16 @@ impl Config {
 // Track in-flight completion tasks. Cancelling marks the entry so that:
 //  - the cancel handler immediately writes a -32003 response for the JSON-RPC request id; and
 //  - the task aborts its HTTP work if still running.
+// One Mutex covers both fields so the contains+insert pair is atomic — otherwise
+// a cancel in the gap would emit -32003 AND the success reply for one id.
+#[derive(Default)]
+struct PendingState {
+    cancel: HashMap<i64, tokio::task::AbortHandle>,
+    answered: std::collections::HashSet<i64>,
+}
+
 struct Pending {
-    // Maps JSON-RPC numeric request id -> abort handle of the spawn.
-    cancel: Mutex<HashMap<i64, tokio::task::AbortHandle>>,
-    // Set of ids that have already been answered (so cancel racing completion is safe).
-    answered: Mutex<std::collections::HashSet<i64>>,
+    state: Mutex<PendingState>,
 }
 
 pub async fn run() {
@@ -77,8 +82,7 @@ pub async fn run() {
     let documents: Documents = Documents::default();
     let index = index::Index::default();
     let pending = Arc::new(Pending {
-        cancel: Mutex::new(HashMap::new()),
-        answered: Mutex::new(std::collections::HashSet::new()),
+        state: Mutex::new(PendingState::default()),
     });
 
     let stdin = tokio::io::stdin();
@@ -152,15 +156,18 @@ pub async fn run() {
                 let task_id = id.clone();
                 let task = tokio::spawn(async move {
                     let result = completion::handle_completion_request(cfg, docs, idx, val).await;
-                    // If id was cancelled while we worked, skip responding (already answered -32003).
+                    // Atomic with the cancel handler: if the id was already answered (cancel
+                    // raced us and won), drop the result and clean up. Otherwise claim the
+                    // response slot so the cancel handler becomes a no-op.
                     if let Some(n) = num_id {
-                        if pnd.answered.lock().await.contains(&n) {
-                            pnd.cancel.lock().await.remove(&n);
-                            pnd.answered.lock().await.remove(&n);
+                        let mut st = pnd.state.lock().await;
+                        if !st.answered.insert(n) {
+                            st.cancel.remove(&n);
+                            st.answered.remove(&n);
                             return;
                         }
-                        pnd.answered.lock().await.insert(n);
-                        pnd.cancel.lock().await.remove(&n);
+                        st.cancel.remove(&n);
+                        drop(st);
                     }
                     let resp = match result {
                         Ok(v) => rpc::success_response(task_id, v),
@@ -170,7 +177,12 @@ pub async fn run() {
                     let _ = write_message(&mut *w, &resp).await;
                 });
                 if let Some(n) = num_id {
-                    pending.cancel.lock().await.insert(n, task.abort_handle());
+                    pending
+                        .state
+                        .lock()
+                        .await
+                        .cancel
+                        .insert(n, task.abort_handle());
                 }
             }
             ("completion/cancel", None) => {
@@ -179,13 +191,15 @@ pub async fn run() {
                     .and_then(|p| p.get("request_id"))
                     .and_then(|r| r.as_i64())
                 {
-                    let handle = pending.cancel.lock().await.remove(&rid);
-                    let already_answered = pending.answered.lock().await.contains(&rid);
+                    let mut st = pending.state.lock().await;
+                    let handle = st.cancel.remove(&rid);
+                    // insert returns false if already answered → no-op race case.
+                    let should_respond = st.answered.insert(rid);
+                    drop(st);
                     if let Some(h) = handle {
                         h.abort();
                     }
-                    if !already_answered {
-                        pending.answered.lock().await.insert(rid);
+                    if should_respond {
                         let err = JsonRpcError::cancelled().into_response(RequestId::Num(rid));
                         write(&writer, err).await;
                     }

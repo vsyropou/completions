@@ -79,7 +79,9 @@ function onMessage(body: string) {
   try {
     msg = JSON.parse(body);
   } catch {
-    output.appendLine(`sidecar: unparseable message: ${body.slice(0, 200)}`);
+    output.appendLine(
+      `sidecar: unparseable message length=${body.length} firstNonPrintable=${body.split("").findIndex((c) => c < " " && c !== "\r" && c !== "\n")}`
+    );
     return;
   }
   if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {

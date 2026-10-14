@@ -1,9 +1,19 @@
+//! Assemble the `repository_context` string sent to Phoenix. This is where
+//! *context selection* lives: which symbols/imports make it into the prompt.
+//!
+//! To *change* what gets picked, edit [`build_repository_context`]. To change
+//! the *ranking* heuristic (which files are even considered), see
+//! `crate::index::Index` and the way we resolve `import ... from "./y"` here.
+
 use crate::index::{Index, Symbol};
 use std::path::{Path, PathBuf};
 use tree_sitter::{Node, Tree};
 
+/// Byte cap on the final `repository_context` string. Keeps prompt size sane.
 pub const REPO_CTX_CAP: usize = 2000;
 
+/// Innermost enclosing function and class names at a cursor position. Either
+/// may be `None` if the cursor sits at top level.
 pub struct Enclosing {
     pub function: Option<String>,
     pub class: Option<String>,
@@ -42,6 +52,7 @@ pub fn enclosing_at(tree: &Tree, text: &str, byte_offset: usize) -> Enclosing {
     Enclosing { function, class }
 }
 
+/// Read the `name` field of a function/class node with source text.
 fn name_of(node: &Node, text: &str) -> Option<String> {
     // Methods store the name under "name" field too (property_identifier).
     node.child_by_field_name("name")
@@ -123,6 +134,8 @@ pub async fn resolve_import(index: &Index, current_file: &str, spec: &str) -> Op
     None
 }
 
+/// Lexically collapse `.` and `..` segments in `p` (like `Path::normalize`
+/// would, but stdlib doesn't have one). Does not touch the filesystem.
 fn normalize(p: &Path) -> PathBuf {
     // Resolve "a/./b" and "a/../b" lexically (Path::normalize equivalent via components).
     let mut out = PathBuf::new();
@@ -194,6 +207,7 @@ pub async fn build_repository_context(
     out
 }
 
+/// Format one index symbol as a context line: `kind name (file:line_1based)`.
 fn fmt_symbol(s: &Symbol, file: &str) -> String {
     // line here is 0-based row; report 1-based
     format!("{} {} ({}:{})", s.kind, s.name, file, s.line + 1)

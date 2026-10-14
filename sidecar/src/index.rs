@@ -1,3 +1,12 @@
+//! Workspace symbol index: path → list of top-level symbols and import
+//! specifiers for every `.ts` / `.tsx` file. Built once in the background on
+//! `initialize`, refreshed per-file on every `didOpen`/`didChange`.
+//!
+//! `context.rs` consults this to assemble the `repository_context` field of
+//! the Phoenix HTTP payload — see [`build_index`] and [`extract`]. If you're
+//! tuning *which* symbols end up ranked/picked, that's in `context.rs`'s
+//! selection logic, not here.
+
 use crate::syntax::{parse, Lang};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -5,6 +14,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tree_sitter::{Node, Tree};
 
+/// A single top-level declaration. Kind strings match what we report in
+/// `repository_context` lines.
 #[derive(Debug, Clone)]
 pub struct Symbol {
     pub name: String,
@@ -12,6 +23,8 @@ pub struct Symbol {
     pub line: usize,        // 0-based
 }
 
+/// Two maps keyed by workspace-relative path. Cheap to clone; clones share
+/// the underlying storage.
 #[derive(Default, Clone)]
 pub struct Index {
     /// file path (relative to workspace_root, forward slashes) → symbols
@@ -21,11 +34,13 @@ pub struct Index {
 }
 
 impl Index {
+    /// Replace the entry for one file (called on `didOpen` / `didChange`).
     pub async fn set_file(&self, path: PathBuf, symbols: Vec<Symbol>, imports: Vec<String>) {
         self.inner.write().await.insert(path.clone(), symbols);
         self.imports.write().await.insert(path, imports);
     }
 
+    /// Snapshot of symbols for one path. Empty if never seen.
     pub async fn symbols_for(&self, path: &Path) -> Vec<Symbol> {
         self.inner
             .read()
@@ -35,6 +50,7 @@ impl Index {
             .unwrap_or_default()
     }
 
+    /// Snapshot of import specifiers (as written) for one path. Empty if never seen.
     pub async fn imports_of(&self, path: &Path) -> Vec<String> {
         self.imports
             .read()
@@ -44,6 +60,8 @@ impl Index {
             .unwrap_or_default()
     }
 
+    /// All indexed paths (workspace-relative). Used by `context.rs` for ranking
+    /// and by `initialize` for logging.
     pub async fn all_paths(&self) -> Vec<PathBuf> {
         self.inner.read().await.keys().cloned().collect()
     }
@@ -102,6 +120,8 @@ pub fn extract(tree: &Tree, text: &str) -> (Vec<Symbol>, Vec<String>) {
     (symbols, imports)
 }
 
+/// Push a `Symbol` for a declaration that carries its name under the `name`
+/// field (covers functions, classes, interfaces, type aliases).
 fn push_named(symbols: &mut Vec<Symbol>, node: &Node, text: &str, kind: &'static str) {
     if let Some(name_node) = node.child_by_field_name("name") {
         if let Ok(name) = name_node.utf8_text(text.as_bytes()) {
@@ -114,6 +134,8 @@ fn push_named(symbols: &mut Vec<Symbol>, node: &Node, text: &str, kind: &'static
     }
 }
 
+/// `const`/`let` declarations can bind several names (`const A = 1, B = 2`);
+/// walk each `variable_declarator` and push each as `const`.
 fn collect_var_names(symbols: &mut Vec<Symbol>, node: &Node, text: &str) {
     let mut cursor = node.walk();
     for decl in node.children(&mut cursor) {
@@ -131,6 +153,8 @@ fn collect_var_names(symbols: &mut Vec<Symbol>, node: &Node, text: &str) {
     }
 }
 
+/// Pull the module specifier string out of an `import_statement` and push it
+/// (quotes stripped) onto `imports`.
 fn collect_import(node: &Node, text: &str, imports: &mut Vec<String>) {
     // import_statement children: "import", import_clause, "from", string, ";"
     // Find the string child.

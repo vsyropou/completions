@@ -1,3 +1,6 @@
+//! Binary entry point. Configures tracing to stderr (stdout is reserved for the
+//! JSON-RPC protocol stream — see `../protocol/README.md`) and hands off to `sidecar::run`.
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()

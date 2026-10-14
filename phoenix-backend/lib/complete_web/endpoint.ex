@@ -1,4 +1,18 @@
 defmodule CompleteWeb.Endpoint do
+  @moduledoc """
+  Phoenix HTTP endpoint. Plug pipeline order:
+
+    1. `Plug.RequestId` — stamps a request id for logs.
+    2. `Plug.Telemetry` — emits `[:phoenix, :endpoint, ...]` telemetry.
+    3. `Plug.Parsers` — JSON-only body parsing, 256 KB cap (protocol §3.1).
+       Raises `Plug.Parsers.RequestTooLargeError` (→ 413) and
+       `Plug.Parsers.ParseError` (→ 400), which Phoenix's built-in
+       `render_errors` forwards to `CompleteWeb.ErrorJSON`.
+    4. `CompleteWeb.Router` — routes the request.
+
+  Configuration lives in `config/runtime.exs`; `PORT` sets the listen
+  port (default 4000).
+  """
   use Phoenix.Endpoint, otp_app: :complete
 
   plug Plug.RequestId

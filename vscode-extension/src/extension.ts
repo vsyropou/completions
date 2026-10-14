@@ -6,6 +6,10 @@ import { encodeMessage, FrameDecoder } from "./framing";
 
 const REQUEST_TIMEOUT_MS = 8000;
 const SHUTDOWN_TIMEOUT_MS = 2000;
+/**
+ * VS Code languageId → sidecar language tag.
+ * Only listed languages get completions and document sync.
+ */
 const LANGUAGE_MAP: Record<string, string> = {
   typescript: "typescript",
   typescriptreact: "tsx",
@@ -28,6 +32,12 @@ function config() {
   return vscode.workspace.getConfiguration("completion");
 }
 
+/**
+ * Resolve the sidecar binary path.
+ *
+ * Order: `completion.sidecarPath` config override → built-in
+ * `<extensionPath>/bin/sidecar-<platform>-<arch>[.exe]`.
+ */
 function sidecarPath(context: vscode.ExtensionContext): string | undefined {
   const override = config().get<string>("sidecarPath");
   if (override) return override;
@@ -40,6 +50,9 @@ function send(msg: object) {
   child.stdin.write(encodeMessage(JSON.stringify(msg)));
 }
 
+/**
+ * Send a JSON-RPC request and await its response. Rejects after `timeoutMs`.
+ */
 function sendRequest(method: string, params: object | undefined, timeoutMs: number): Promise<unknown> {
   return new Promise((resolve, reject) => {
     if (!child?.stdin?.writable) {
@@ -108,6 +121,10 @@ function killChild() {
   }
 }
 
+/**
+ * Spawn the sidecar process and wire up stdio. Returns false if the binary
+ * is not on disk (already logged). On unexpected exit, auto-restarts once.
+ */
 function spawnSidecar(context: vscode.ExtensionContext): boolean {
   const bin = sidecarPath(context);
   if (!bin || !fs.existsSync(bin)) {
@@ -159,6 +176,10 @@ function languageOf(doc: vscode.TextDocument): string | undefined {
   return LANGUAGE_MAP[doc.languageId];
 }
 
+/**
+ * Send `initialize` with workspace + Phoenix config, then `didOpen` for
+ * every already-open supported document.
+ */
 async function initializeAndSync() {
   const cfg = config();
   const workspaceRoot =
@@ -184,6 +205,9 @@ async function initializeAndSync() {
   }
 }
 
+/**
+ * Forward a document-open to the sidecar, if the language is supported.
+ */
 function syncOpen(doc: vscode.TextDocument) {
   const lang = languageOf(doc);
   if (!lang) return;
@@ -211,6 +235,13 @@ function syncClose(doc: vscode.TextDocument) {
   sendNotification("textDocument/didClose", { uri: doc.uri.toString() });
 }
 
+/**
+ * Inline-completion provider entry point. Fires on typing pause.
+ *
+ * Sends `completion/request` to the sidecar and races VS Code's cancellation
+ * token. Returns `[]` on any failure, staleness, or cancellation — the
+ * editor must never be blocked by a slow/missing backend.
+ */
 async function provideInlineCompletionItems(
   doc: vscode.TextDocument,
   position: vscode.Position,
@@ -256,6 +287,13 @@ async function provideInlineCompletionItems(
   }
 }
 
+/**
+ * Extension activation (triggered by `onLanguage:typescript[-react]`).
+ *
+ * Starts the sidecar, sends `initialize`, and registers the inline
+ * completion provider + document-sync listeners on the `completion`
+ * configuration namespace.
+ */
 export function activate(context: vscode.ExtensionContext) {
   output = vscode.window.createOutputChannel("Completion Sidecar");
   context.subscriptions.push(output);
@@ -277,6 +315,10 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
+/**
+ * Clean shutdown: ask the sidecar to exit, wait briefly, kill if it hasn't,
+ * and reject any in-flight requests.
+ */
 export async function deactivate() {
   if (child) {
     try {

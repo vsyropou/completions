@@ -3,6 +3,22 @@ defmodule CompleteWeb.CompletionController do
 
   @required ~w(request_id language file_path prefix suffix repository_context)
 
+  @doc """
+  `POST /api/v1/completions`. Validates the body against the frozen
+  protocol, delegates inference to `Complete.CompletionGateway.generate/1`,
+  and shapes the response.
+
+  Responses:
+
+    * `200` — completion JSON
+    * `400` `invalid_request` — missing/non-string required field, malformed `max_tokens`
+    * `422` `validation_failed` — `max_tokens` outside `1..1024`
+    * `502` `upstream_error` — provider returned `finish_reason: "error"`
+
+  Add new validation rules as a `validate_*` clause threaded through the
+  `with` below; each returns `{:error, http_status, code, message}` and
+  short-circuits to the 4xx JSON body.
+  """
   def create(conn, params) do
     with :ok <- validate_required(params),
          :ok <- validate_max_tokens_type(params["max_tokens"]),

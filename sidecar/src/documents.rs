@@ -1,7 +1,13 @@
+//! In-memory document table. Tracks the text/version/language of every file the
+//! extension has told us about. Version is monotonically increasing per URI —
+//! stale `didChange` notifications are silently dropped so we never serve an
+//! old snapshot to a completion request.
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// One open document's current state.
 #[derive(Debug, Clone)]
 pub struct Document {
     pub text: String,
@@ -9,12 +15,15 @@ pub struct Document {
     pub language: String,
 }
 
+/// Thread-safe map of URI → `Document`. Cheap to clone; clones share the
+/// same underlying map.
 #[derive(Clone, Default)]
 pub struct Documents {
     inner: Arc<RwLock<HashMap<String, Document>>>,
 }
 
 impl Documents {
+    /// `textDocument/didOpen` notification handler.
     pub async fn did_open(&self, params: &serde_json::Value) {
         let Some(uri) = params
             .get("uri")
@@ -49,6 +58,8 @@ impl Documents {
         );
     }
 
+    /// `textDocument/didChange` (full-document replacement in v1). Ignores the
+    /// update if the incoming `version` is not strictly greater than ours.
     pub async fn did_change(&self, params: &serde_json::Value) {
         let Some(uri) = params
             .get("uri")
@@ -97,6 +108,7 @@ impl Documents {
         }
     }
 
+    /// `textDocument/didClose` notification handler. Removes the entry.
     pub async fn did_close(&self, params: &serde_json::Value) {
         if let Some(uri) = params.get("uri").and_then(|v| v.as_str()) {
             let mut m = self.inner.write().await;
@@ -104,6 +116,8 @@ impl Documents {
         }
     }
 
+    /// Snapshot the current state of a document. Returns `None` if the URI
+    /// hasn't been opened (caller maps this to `-32000`).
     pub async fn get(&self, uri: &str) -> Option<Document> {
         self.inner.read().await.get(uri).cloned()
     }

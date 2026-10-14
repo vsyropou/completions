@@ -1,3 +1,12 @@
+//! The `completion/request` handler: validate input against the doc table,
+//! build prefix/suffix/context, POST to Phoenix, return the completion.
+//!
+//! Two non-obvious pieces live here:
+//! - UTF-16 → UTF-8 offset conversion (VS Code speaks UTF-16 code units;
+//!   Rust strings are UTF-8 bytes) — see [`utf16_to_utf8_offset`].
+//! - Capping prefix/suffix to fit the HTTP body limit without splitting a
+//!   multi-byte character — see [`cap_prefix`] / [`cap_suffix`].
+
 use crate::rpc::JsonRpcError;
 use serde::Deserialize;
 use serde_json::json;
@@ -5,6 +14,7 @@ use serde_json::json;
 const PREFIX_CAP: usize = 6000;
 const SUFFIX_CAP: usize = 1000;
 
+/// Deserialized `completion/request` params. Field names match the protocol.
 #[derive(Deserialize)]
 pub struct CompletionParams {
     pub document_uri: String,
@@ -14,12 +24,16 @@ pub struct CompletionParams {
     pub max_tokens: Option<u32>,
 }
 
+/// Zero-based `{line, character}` in UTF-16 code units (protocol §4).
 #[derive(Deserialize)]
 pub struct Position {
     pub line: usize,
     pub character: usize,
 }
 
+/// Convert a zero-based `{line, character}` UTF-16 position into a byte offset
+/// in `text`. Errors map to JSON-RPC `-32602 invalid params`. Mid-surrogate-pair
+/// positions resolve to the boundary *before* the pair (protocol §4).
 pub fn utf16_to_utf8_offset(
     text: &str,
     target_line: usize,
@@ -65,6 +79,8 @@ pub fn utf16_to_utf8_offset(
     )))
 }
 
+/// Take the first `max` bytes of `s`, backing off to a UTF-8 char boundary so
+/// we never split a multi-byte character.
 pub fn cap_suffix(s: &str, max: usize) -> &str {
     if s.len() <= max {
         return s;
@@ -76,6 +92,8 @@ pub fn cap_suffix(s: &str, max: usize) -> &str {
     &s[..end]
 }
 
+/// Take the last `max` bytes of `s`, walking forward to a UTF-8 char boundary
+/// so we never split a multi-byte character.
 pub fn cap_prefix(s: &str, max: usize) -> &str {
     if s.len() <= max {
         return s;
@@ -87,6 +105,11 @@ pub fn cap_prefix(s: &str, max: usize) -> &str {
     &s[start..]
 }
 
+/// Handle a `completion/request` JSON-RPC request end-to-end. Returns the
+/// `result` body (or an error to be serialized via `JsonRpcError::into_response`).
+///
+/// Order of checks is protocol-mandated: unknown document (`-32000`) →
+/// version mismatch (`-32001`) → upstream errors (`-32002`).
 pub async fn handle_completion_request(
     cfg: crate::Config,
     documents: crate::documents::Documents,

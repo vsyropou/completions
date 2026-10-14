@@ -1,5 +1,14 @@
 defmodule Complete.Application do
-  @moduledoc false
+  @moduledoc """
+  OTP application entry point. Starts the supervision tree:
+
+    * `Finch` (HTTP client pool named `Complete.Finch`) — used only by
+      `Complete.FimAdapter` when `INFERENCE_BASE_URL` is set.
+    * `CompleteWeb.Endpoint` — the Phoenix HTTP endpoint serving
+      `POST /api/v1/completions`.
+
+  Both children restart independently under a `:one_for_one` strategy.
+  """
   use Application
 
   @impl true

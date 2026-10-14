@@ -5,8 +5,14 @@ defmodule CompleteWeb.Plugs.Auth do
 
   import Plug.Conn
 
+  @doc "Stores options (none used; kept for Plug behaviour conformance)."
   def init(opts), do: opts
 
+  @doc """
+  Compares `Authorization: Bearer <token>` against the configured
+  `:complete, :auth_token`. Halts with 401 and the protocol error shape
+  on mismatch or missing header; otherwise passes the conn through.
+  """
   def call(conn, _opts) do
     expected = Application.fetch_env!(:complete, :auth_token)
 

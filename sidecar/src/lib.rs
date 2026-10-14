@@ -1,3 +1,10 @@
+//! Sidecar library — JSON-RPC 2.0 over stdio server driving completions.
+//!
+//! Spawned as a child process by the VS Code extension. Reads LSP-style framed
+//! JSON-RPC from stdin, writes responses to stdout, logs to stderr, and
+//! forwards completion work to the Phoenix backend over HTTP. See
+//! `../protocol/README.md` for the frozen wire contract.
+
 pub mod completion;
 pub mod context;
 pub mod documents;
@@ -13,11 +20,13 @@ use tokio::sync::Mutex;
 use documents::Documents;
 use rpc::{read_message, write_message, JsonRpcError, RequestId};
 
+/// Shared runtime configuration. Cheap to clone (Arc inside).
 #[derive(Clone)]
 pub struct Config {
     pub(crate) inner: Arc<Mutex<Inner>>,
 }
 
+/// The mutable fields behind `Config`. Lock, mutate, drop.
 pub struct Inner {
     pub phoenix_url: String,
     pub auth_token: String,
@@ -77,6 +86,7 @@ struct Pending {
     state: Mutex<PendingState>,
 }
 
+/// Run the JSON-RPC loop until `shutdown` or stdin EOF. Entry point called from `main`.
 pub async fn run() {
     let config = Config::default();
     let documents: Documents = Documents::default();
@@ -231,15 +241,22 @@ pub async fn run() {
     }
 }
 
+/// Lock the shared stdout writer and push one framed message. Bytes sent are dropped
+/// silently on I/O error — the extension is the only reader, and if it's gone we're
+/// shutting down anyway.
 async fn write(writer: &Arc<Mutex<tokio::io::Stdout>>, v: serde_json::Value) {
     let mut w = writer.lock().await;
     let _ = write_message(&mut *w, &v).await;
 }
 
+/// Shorthand for `write()` of an error response.
 async fn write_err(writer: &Arc<Mutex<tokio::io::Stdout>>, id: RequestId, e: JsonRpcError) {
     write(writer, e.into_response(id)).await;
 }
 
+/// Handle `initialize`: pull `phoenix_url`, `auth_token`, `workspace_root`,
+/// `max_tokens`, `measure_latency` out of params, stash them in `Config`, and
+/// spawn workspace indexing in the background so completions never wait on it.
 async fn handle_initialize(
     cfg: &Config,
     val: &serde_json::Value,
@@ -296,6 +313,7 @@ async fn handle_initialize(
     Ok(serde_json::json!({ "capabilities": { "languages": ["typescript", "tsx"] } }))
 }
 
+/// Convert a `file:///repo` URI to a filesystem path. `None` if empty.
 fn workspace_root_to_path(root: &str) -> Option<std::path::PathBuf> {
     let p = root.strip_prefix("file://").unwrap_or(root);
     if p.is_empty() {
@@ -334,6 +352,8 @@ async fn refresh_index_for_doc(
         .await;
 }
 
+/// Strip the workspace prefix (or `file://`) off a URI to yield a repo-relative
+/// forward-slash path — the shape Phoenix expects in `file_path`.
 pub fn repo_relative_str(workspace_root: &str, uri: &str) -> String {
     if !workspace_root.is_empty() {
         if let Some(stripped) = uri.strip_prefix(workspace_root) {

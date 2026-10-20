@@ -6,25 +6,7 @@
   "publisher": "vasilis",
   "engines": { "vscode": "^1.85.0" },
   "activationEvents": [
-    "onLanguage:typescript",
-    "onLanguage:typescriptreact",
-    "onLanguage:javascript",
-    "onLanguage:javascriptreact",
-    "onLanguage:python",
-    "onLanguage:rust",
-    "onLanguage:go",
-    "onLanguage:java",
-    "onLanguage:c",
-    "onLanguage:cpp",
-    "onLanguage:csharp",
-    "onLanguage:elixir",
-    "onLanguage:json",
-    "onLanguage:yaml",
-    "onLanguage:dockerfile",
-    "onLanguage:makefile",
-    "onLanguage:html",
-    "onLanguage:css",
-    "onLanguage:markdown"
+    "*"
   ],
   "main": "./out/extension.js",
   "contributes": {

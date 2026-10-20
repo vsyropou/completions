@@ -15,9 +15,9 @@ VS Code extension (TS) ──JSON-RPC 2.0/stdio──▶ Rust sidecar ──▶ 
 The Rust sidecar is the smart one: it does prompt assembly (FIM templating), calls the inference server directly, and post-facto notifies Phoenix with a fire-and-forget telemetry event. Phoenix is no longer an inference proxy — it's a 500-event in-memory ring buffer with three read endpoints.
 
 - `extension/` — explicit `onLanguage:*` activation list (19 languages), spawns sidecar per window, JSON-RPC client over stdio.
-- `sidecar/` — per-window process. `main.rs`/`rpc.rs`/`lib.rs` (dispatch loop) real; `documents`/`syntax`/`index`/`context` real (tree-sitter parses 14 languages, BM25 over repo files, cursor-excerpt expansion); `inference.rs` (FimAdapter ported from Elixir) real; `telemetry.rs` detached POST to Phoenix.
+- [`sidecar/`](./sidecar/) — per-window process. [`main.rs`](./sidecar/src/main.rs)/[`rpc.rs`](./sidecar/src/rpc.rs)/[`lib.rs`](./sidecar/src/lib.rs) (dispatch loop) real; [`documents`](./sidecar/src/documents.rs)/[`syntax`](./sidecar/src/syntax.rs)/[`index`](./sidecar/src/index.rs)/[`context`](./sidecar/src/context.rs) real (tree-sitter parses 14 languages, BM25 over repo files, cursor-excerpt expansion); [`inference.rs`](./sidecar/src/inference.rs) (FimAdapter ported from Elixir) real; [`telemetry.rs`](./sidecar/src/telemetry.rs) detached POST to Phoenix.
 - `telemetry/` — Phoenix telemetry sink. `TelemetryStore` (Agent, 500-event cap) + `POST /api/v1/telemetry/completions`, `GET /api/v1/telemetry/completions`, `GET /api/v1/telemetry/stats`. Old `CompletionGateway` / `MockProvider` deleted.
-- `protocol/README.md` — **frozen v1.1 wire contract** for the extension↔sidecar hop. Phoenix-side HTTP contract is internal; not in the frozen spec.
+- [`protocol/README.md`](./protocol/README.md) — **frozen v1.2 wire contract** for the extension↔sidecar hop. Phoenix-side HTTP contract is internal; not in the frozen spec.
 
 ## Hard rules in the contract
 
@@ -26,7 +26,7 @@ The Rust sidecar is the smart one: it does prompt assembly (FIM templating), cal
 - `didChange` is **full-document replacement** only; `didChange` version must equal `current + 1` or the update is swallowed (`warn`, no error response — it's a notification).
 - Sidecar stdout is protocol-only; all logs go to stderr (`tracing`). Framing is LSP-style `Content-Length` headers — malformed frames are fatal, 256 KB cap enforced.
 - Cancellation: `completion/cancel` uses `AbortHandle` + shared `answered` HashSet under one Mutex. Cancel claims the answer slot and writes `-32003` immediately; the aborted task's claim-on-finish fails so nothing double-sends.
-- Debounce: `completion.rs` applies a per-URI 200 ms debounce, latest-wins; superseded requests return `-32003`.
+- Debounce: [`completion.rs`](./sidecar/src/completion.rs) applies a per-URI 200 ms debounce, latest-wins; superseded requests return `-32003`.
 
 ## Commands
 
@@ -83,7 +83,7 @@ To try a real model, set `modelUrl` + `model` (+ `modelApiKey` if your server ne
 
 ## Multi-language support
 
-`Lang` in `syntax.rs` covers 14 grammar-backed languages (TS/TSX/JS/JSX/Python/Rust/Go/Java/C/Cpp/CSharp/Elixir/Json/Yaml) + `NoParser` fallback. `activationEvents` is the explicit 19-language list — **keep it in sync with the Lang enum when adding a language** (new Lang variant, grammar dep, extractor in `index.rs::extract`, import resolver in `context.rs::resolve_import`, plus matching `onLanguage:` entry in `extension/package.json`).
+`Lang` in [`syntax.rs`](./sidecar/src/syntax.rs) covers 14 grammar-backed languages (TS/TSX/JS/JSX/Python/Rust/Go/Java/C/Cpp/CSharp/Elixir/Json/Yaml) + `NoParser` fallback. `activationEvents` is the explicit 19-language list in [`extension/package.json`](./extension/package.json) — **keep it in sync with the Lang enum when adding a language** (new Lang variant, grammar dep, extractor in [`index.rs::extract`](./sidecar/src/index.rs), import resolver in [`context.rs::resolve_import`](./sidecar/src/context.rs), plus matching `onLanguage:` entry).
 
 ## Test layout (recently relocated — don't re-inline)
 
@@ -93,7 +93,7 @@ src/{completion,context,documents,index,lib,rpc,syntax,inference,telemetry}.rs
    ↓
 tests/{completion,context,documents,dispatch,index,rpc,syntax,inference,telemetry}.rs
 ```
-`tests/dispatch.rs` holds `src/lib.rs`'s tests (the name `lib.rs` would shadow the crate). Shared helpers inline at the top of each test file. New tests go into a matching `tests/<module>.rs` — **never** `#[cfg(test)] mod tests` in `src/`.
+[`tests/dispatch.rs`](./sidecar/tests/dispatch.rs) holds [`src/lib.rs`](./sidecar/src/lib.rs)'s tests (the name `lib.rs` would shadow the crate). Shared helpers inline at the top of each test file. New tests go into a matching [`tests/<module>.rs`](./sidecar/tests/) — **never** `#[cfg(test)] mod tests` in [`src/`](./sidecar/src/).
 
 ## Phoenix telemetry API quick reference
 

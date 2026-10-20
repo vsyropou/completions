@@ -57,7 +57,7 @@ Content-Type: application/json
 Authorization: Bearer {model_api_key}      # only when configured
 ```
 
-Body: `{model, prompt, max_tokens: 128, temperature: 0.2, stop: []}`. The sidecar builds `prompt` per `fim_template` (defaults to the Starcoder chain `<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>`), prefixed with `# Path: <file_path>` plus an optional `# Related symbols:` block from `index.rs` + `context.rs`.
+Body: `{model, prompt, max_tokens: 128, temperature: 0.2, stop: []}`. The sidecar builds `prompt` per `fim_template` (defaults to the Starcoder chain `<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>`), prefixed with `# Path: <file_path>` plus an optional `# Related symbols:` block from [`index.rs`](../sidecar/src/index.rs) + [`context.rs`](../sidecar/src/context.rs).
 
 Response (200): OpenAI-compatible `{"choices":[{"text":…, "finish_reason":…}]}`. Errors map to JSON-RPC `-32002`.
 

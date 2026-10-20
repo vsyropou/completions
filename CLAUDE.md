@@ -16,7 +16,7 @@ The Rust sidecar is the smart one: it does prompt assembly (FIM templating), cal
 
 - `extension/` — explicit `onLanguage:*` activation list (19 languages), spawns sidecar per window, JSON-RPC client over stdio.
 - [`sidecar/`](./sidecar/) — per-window process. [`main.rs`](./sidecar/src/main.rs)/[`rpc.rs`](./sidecar/src/rpc.rs)/[`lib.rs`](./sidecar/src/lib.rs) (dispatch loop) real; [`documents`](./sidecar/src/documents.rs)/[`syntax`](./sidecar/src/syntax.rs)/[`index`](./sidecar/src/index.rs)/[`context`](./sidecar/src/context.rs) real (tree-sitter parses 14 languages, BM25 over repo files, cursor-excerpt expansion); [`inference.rs`](./sidecar/src/inference.rs) (FimAdapter ported from Elixir) real; [`telemetry.rs`](./sidecar/src/telemetry.rs) detached POST to Phoenix.
-- `telemetry/` — Phoenix telemetry sink. `TelemetryStore` (Agent, 500-event cap) + `POST /api/v1/telemetry/completions`, `GET /api/v1/telemetry/completions`, `GET /api/v1/telemetry/stats`. Old `CompletionGateway` / `MockProvider` deleted.
+- `telemetry/` — Phoenix telemetry sink. `TelemetryStore` (Agent, 500-event cap) + `POST /api/v1/completions`, `GET /api/v1/completions`, `GET /api/v1/stats`. Old `CompletionGateway` / `MockProvider` deleted.
 - [`protocol/README.md`](./protocol/README.md) — **frozen v1.2 wire contract** for the extension↔sidecar hop. Phoenix-side HTTP contract is internal; not in the frozen spec.
 
 ## Hard rules in the contract
@@ -79,7 +79,7 @@ package.json contributes ──▶ extension.ts activate() ──▶ initialize.
 | `completion.telemetryUrl` | `telemetry_url`     | `telemetry_url`   | Telemetry sink URL; empty = disabled    |
 | `completion.telemetryApiKey`| `telemetry_api_key`| `telemetry_api_key`| Bearer to telemetry sink             |
 
-To try a real model, set `modelUrl` + `model` (+ `modelApiKey` if your server needs auth), reload the dev-host window, then watch `GET /api/v1/telemetry/stats` flip `"provider":"mock"` → `"provider":"model"`.
+To try a real model, set `modelUrl` + `model` (+ `modelApiKey` if your server needs auth), reload the dev-host window, then watch `GET /api/v1/stats` flip `"provider":"mock"` → `"provider":"model"`.
 
 ## Multi-language support
 
@@ -97,9 +97,9 @@ tests/{completion,context,documents,dispatch,index,rpc,syntax,inference,telemetr
 
 ## Phoenix telemetry API quick reference
 
-- `POST /api/v1/telemetry/completions` — Bearer auth, `{request_id, language, file_path, prompt, response, latency_ms, provider, model, finish_reason}` → `202`.
-- `GET /api/v1/telemetry/completions` — 50 newest, newest-first, full bodies.
-- `GET /api/v1/telemetry/stats` — `{count, avg_latency_ms, by_language}`.
+- `POST /api/v1/completions` — Bearer auth, `{request_id, language, file_path, prompt, response, latency_ms, provider, model, finish_reason}` → `202`.
+- `GET /api/v1/completions` — 50 newest, newest-first, full bodies.
+- `GET /api/v1/stats` — `{count, avg_latency_ms, by_language}`.
 - Storage: in-memory, capped 500 events, dies on restart. `# ponytail:` swap for SQLite when the cap proves small.
 
 ## Env vars (Phoenix)

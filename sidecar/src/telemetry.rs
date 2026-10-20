@@ -1,5 +1,5 @@
 //! Fire-and-forget telemetry: POST each completion to the telemetry sink's
-//! `/api/v1/telemetry/completions` endpoint after the inference result has
+//! `/api/v1/completions` endpoint after the inference result has
 //! already been sent back to the editor. Never blocks the response path;
 //! errors are logged at `debug` and dropped.
 
@@ -37,7 +37,7 @@ pub fn fire(cfg: crate::Config, t: Telemetry) {
             return; // telemetry sink not configured — skip silently
         }
         let url = format!(
-            "{}/api/v1/telemetry/completions",
+            "{}/api/v1/completions",
             telemetry_url.trim_end_matches('/')
         );
         let body = json!({

@@ -1,8 +1,6 @@
 # telemetry
 
-Phoenix (Elixir) backend. Telemetry sink only — the sidecar posts fire-and-forget events here after each completion; this component serves 3 read endpoints over an in-memory ring buffer.
-
-Not an inference proxy. The old `CompletionGateway` / `MockProvider` / `POST /api/v1/completions` are gone.
+Telemetry sink backend — the sidecar posts fire-and-forget events here after each completion; this component serves 3 read endpoints over an in-memory ring buffer.
 
 ## Layout
 
@@ -24,21 +22,22 @@ test/                                 # ExUnit tests (store + controller)
 
 All behind Bearer auth (`AUTH_TOKEN` env, default `dev-token`).
 
-- `POST /api/v1/telemetry/completions` — store one event. Returns `202 {}`.
-- `GET  /api/v1/telemetry/completions` — `{"events": [ ... 50 newest ... ]}` newest-first, full bodies.
-- `GET  /api/v1/telemetry/stats` — `{"count": N, "avg_latency_ms": X, "by_language": {...}, "by_provider": {...}}`.
+- `POST /api/v1/completions` — store one event. Returns `202 {}`.
+- `GET  /api/v1/completions` — `{"events": [ ... 50 newest ... ]}` newest-first, full bodies.
+- `GET  /api/v1/stats` — `{"count": N, "avg_latency_ms": X, "by_language": {...}, "by_provider": {...}}`.
 
 Event body (written by [`sidecar/src/telemetry.rs`](../sidecar/src/telemetry.rs)):
+
 ```json
 {
-  "request_id":    "…",
-  "language":      "…",
-  "file_path":     "…",
-  "prompt":        "<full prompt sent to inference>",
-  "response":      "<full completion>",
-  "latency_ms":    0,
-  "provider":      "model|mock",
-  "model":         "…",
+  "request_id": "…",
+  "language": "…",
+  "file_path": "…",
+  "prompt": "<full prompt sent to inference>",
+  "response": "<full completion>",
+  "latency_ms": 0,
+  "provider": "model|mock",
+  "model": "…",
   "finish_reason": "stop|length|error"
 }
 ```
@@ -53,7 +52,7 @@ mix test          # store+controller tests
 
 ## Storage
 
-[`Complete.TelemetryStore`](./lib/complete/telemetry_store.ex) is an Elixir `Agent` supervised under [`Complete.Application`](./lib/complete/application.ex). Holds max 500 events in-memory (list, prepend, drop-oldest). Restart loses data — that's intentional for a learning project. `# ponytail:` swap for SQLite or Postgres when the cap proves small.
+[`Complete.TelemetryStore`](./lib/complete/telemetry_store.ex) is an Elixir `Agent` supervised under [`Complete.Application`](./lib/complete/application.ex). Holds max 500 events in-memory (list, prepend, drop-oldest). Restart loses data — that's intentional for a learning project.
 
 ## Config
 

@@ -18927,3 +18927,35 @@ Type: :worker
 10:20:04.277 instance_id=1A157F785EB [debug] Node port message: 
 10:20:04.277 [debug] sent notification server -> client $/progress
 
+
+13:53:34.936 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+13:53:34.936 instance_id=1A157F785EB [error] Save failed for uri file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/README.md error was {:error, :not_open}
+
+13:53:34.937 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+13:53:34.937 instance_id=1A157F785EB [error] Failed to handle textDocument/didSave, {{:error, :not_open}, %XPExpert.State{initialized?: true, shutdown_received?: false, in_flight_requests: %{}, deps_declined_projects: MapSet.new([])}}
+
+13:53:34.937 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didSave in 8ms
+
+13:55:07.455 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+13:55:07.455 instance_id=1A157F785EB [error] Save failed for uri file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/README.md error was {:error, :not_open}
+
+13:55:07.456 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+13:55:07.456 instance_id=1A157F785EB [error] Failed to handle textDocument/didSave, {{:error, :not_open}, %XPExpert.State{initialized?: true, shutdown_received?: false, in_flight_requests: %{}, deps_declined_projects: MapSet.new([])}}
+
+13:55:07.456 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didSave in 1ms
+
+13:55:17.942 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didClose in 285µs
+
+13:55:55.639 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+13:55:55.639 instance_id=1A157F785EB [error] Save failed for uri file:///Users/vsyropou/Documents/prs/repos/code-completion-light/README.md error was {:error, :not_open}
+
+13:55:55.640 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+13:55:55.640 instance_id=1A157F785EB [error] Failed to handle textDocument/didSave, {{:error, :not_open}, %XPExpert.State{initialized?: true, shutdown_received?: false, in_flight_requests: %{}, deps_declined_projects: MapSet.new([])}}
+
+13:55:55.640 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didSave in 450µs

@@ -69,7 +69,7 @@ Fire-and-forget, never blocks the editor:
 
 ```
 ```
-POST {telemetry_url}/api/v1/telemetry/completions
+POST {telemetry_url}/api/v1/completions
 Content-Type: application/json
 Authorization: Bearer {telemetry_api_key}
 ```

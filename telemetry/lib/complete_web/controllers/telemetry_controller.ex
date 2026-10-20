@@ -6,7 +6,7 @@ defmodule CompleteWeb.TelemetryController do
   @required ~w(request_id language file_path prompt response latency_ms provider model finish_reason)
 
   @doc """
-  `POST /api/v1/telemetry/completions`. Validates the body shape and
+  `POST /api/v1/completions`. Validates the body shape and
   appends the event to `Complete.TelemetryStore`. Responds `202` with
   `{}`.
   """
@@ -34,12 +34,12 @@ defmodule CompleteWeb.TelemetryController do
     end
   end
 
-  @doc "GET /api/v1/telemetry/completions → newest 50 buffered events."
+  @doc "GET /api/v1/completions → newest 50 buffered events."
   def index(conn, _params) do
     json(conn, %{events: TelemetryStore.recent(50)})
   end
 
-  @doc "GET /api/v1/telemetry/stats → aggregated latency/language stats."
+  @doc "GET /api/v1/stats → aggregated latency/language stats."
   def stats(conn, _params) do
     json(conn, TelemetryStore.stats())
   end

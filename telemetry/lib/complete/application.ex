@@ -4,7 +4,7 @@ defmodule Complete.Application do
 
     * `Complete.TelemetryStore` — in-memory telemetry event buffer.
     * `CompleteWeb.Endpoint` — the Phoenix HTTP endpoint serving
-      `/api/v1/telemetry/*`.
+      `/api/v1/*`.
   """
   use Application
 

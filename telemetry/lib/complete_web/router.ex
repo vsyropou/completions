@@ -4,9 +4,9 @@ defmodule CompleteWeb.Router do
   negotiation and `CompleteWeb.Plugs.Auth` bearer-token auth, then
   scopes telemetry endpoints:
 
-    * `POST /api/v1/telemetry/completions` → append event
-    * `GET  /api/v1/telemetry/completions` → recent events (newest 50)
-    * `GET  /api/v1/telemetry/stats`       → aggregated latency/language stats
+    * `POST /api/v1/completions` → append event
+    * `GET  /api/v1/completions` → recent events (newest 50)
+    * `GET  /api/v1/stats`       → aggregated latency/language stats
   """
   use CompleteWeb, :router
 
@@ -18,8 +18,8 @@ defmodule CompleteWeb.Router do
   scope "/api", CompleteWeb do
     pipe_through :api
 
-    post "/v1/telemetry/completions", TelemetryController, :create
-    get "/v1/telemetry/completions", TelemetryController, :index
-    get "/v1/telemetry/stats", TelemetryController, :stats
+    post "/v1/completions", TelemetryController, :create
+    get "/v1/completions", TelemetryController, :index
+    get "/v1/stats", TelemetryController, :stats
   end
 end

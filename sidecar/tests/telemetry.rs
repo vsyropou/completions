@@ -148,7 +148,7 @@ async fn telemetry_body_has_all_fields() {
         "{headers}"
     );
     assert!(
-        headers.starts_with("POST /api/v1/telemetry/completions "),
+        headers.starts_with("POST /api/v1/completions "),
         "{headers}"
     );
 }

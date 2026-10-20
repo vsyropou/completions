@@ -21,14 +21,14 @@ defmodule CompleteWeb.TelemetryControllerTest do
   end
 
   test "401 without bearer", %{conn: conn} do
-    conn = post(conn, "/api/v1/telemetry/completions", @valid)
+    conn = post(conn, "/api/v1/completions", @valid)
     assert conn.status == 401
     assert json_response(conn, 401)["error"]["code"] == "unauthorized"
   end
 
   test "401 on GETs without bearer", %{conn: conn} do
-    assert get(conn, "/api/v1/telemetry/completions").status == 401
-    assert get(conn, "/api/v1/telemetry/stats").status == 401
+    assert get(conn, "/api/v1/completions").status == 401
+    assert get(conn, "/api/v1/stats").status == 401
   end
 
   test "202 on happy path and event is stored", %{conn: conn} do
@@ -73,7 +73,7 @@ defmodule CompleteWeb.TelemetryControllerTest do
       })
     end
 
-    conn = conn |> authed() |> get("/api/v1/telemetry/completions")
+    conn = conn |> authed() |> get("/api/v1/completions")
     assert conn.status == 200
     %{"events" => events} = json_response(conn, 200)
     assert length(events) == 50
@@ -105,7 +105,7 @@ defmodule CompleteWeb.TelemetryControllerTest do
       finish_reason: "stop"
     })
 
-    conn = conn |> authed() |> get("/api/v1/telemetry/stats")
+    conn = conn |> authed() |> get("/api/v1/stats")
     assert conn.status == 200
     body = json_response(conn, 200)
     assert body["count"] == 2
@@ -121,6 +121,6 @@ defmodule CompleteWeb.TelemetryControllerTest do
     conn
     |> authed()
     |> put_req_header("content-type", "application/json")
-    |> post("/api/v1/telemetry/completions", Jason.encode!(body))
+    |> post("/api/v1/completions", Jason.encode!(body))
   end
 end

@@ -1,4 +1,4 @@
-# code-completion-light
+# code-completion
 
 Low-latency multiline code completion in VS Code. Three processes, split roles:
 
@@ -22,7 +22,7 @@ Top-level layout:
 
 ## Install
 
-Each component has its own toolchain. Elixir/Erlang pinned via `telemetry/.tool-versions` (erlang 28.2, elixir 1.18.4-otp-28) — install via asdf/mise first.
+Each component has its own toolchain. Elixir/Erlang pinned via [`telemetry/.tool-versions`](./telemetry/.tool-versions) (erlang 28.2, elixir 1.18.4-otp-28) — install via asdf/mise first.
 
 ```sh
 cd telemetry && mix setup                                       # deps.get
@@ -30,6 +30,20 @@ cd ../sidecar && cargo build                                    # debug binary a
 export PATH="$HOME/.cargo/bin:$PATH"                            # /usr/local/bin/cargo on this machine is broken
 cd ../extension && npm install && npm run compile               # tsc → out/
 ```
+
+### Packaged install via Makefile
+
+The top-level [`Makefile`](./Makefile) builds the release sidecar, compiles the extension, stages everything, and installs the `.vsix` into VS Code:
+
+```sh
+make compile        # release sidecar + extension compile, stages extension/bin/sidecar
+make package        # produce extension/completion-<version>.vsix via vsce
+make install        # code --install-extension extension/completion-<version>.vsix
+make uninstall      # code --uninstall-extension vasilis.completion
+make clean          # drop staged artifacts
+```
+
+`make install` is the equivalent of "ship it" for a single-machine setup; `make package` alone gives you a `.vsix` you can hand to someone else's VS Code (`Extensions: Install from VSIX…`).
 
 ## Run
 
@@ -40,6 +54,7 @@ Three terminals, plus a VS Code dev-host window:
 3. **Extension** — open `extension/` in VS Code, press F5 → Extension Development Host. In the dev-host, set `completion.sidecarPath` to `…/sidecar/target/debug/sidecar`. Open a `.ts`, `.py`, or any other `.rs`-supported file and type — ghost text appears.
 
 **Headless smoke test** (with Phoenix up):
+
 ```sh
 node integration-tests/e2e.mjs
 ```
@@ -50,14 +65,14 @@ node integration-tests/e2e.mjs
 2. **Framing.** LSP-style headers (`Content-Length: N\r\n\r\n` + JSON body) — see [`extension/src/framing.ts`](./extension/src/framing.ts) on the writer side and [`sidecar/src/rpc.rs`](./sidecar/src/rpc.rs) on the reader side.
 3. **Dispatch.** [`sidecar/src/lib.rs::run`](./sidecar/src/lib.rs) reads frames, dispatches on `method` — `initialize`, document notifications, `completion/request`, `completion/cancel`, `shutdown`. Document state lives in [`documents.rs`](./sidecar/src/documents.rs); syntax/OPL extraction in [`syntax.rs`](./sidecar/src/syntax.rs) (tree-sitter, 14 languages) + [`index.rs`](./sidecar/src/index.rs); prompt-shape in [`context.rs`](./sidecar/src/context.rs) (cursor-excerpt + repo BM25).
 4. **Inference.** [`sidecar/src/inference.rs`](./sidecar/src/inference.rs) builds the FIM prompt (template + repo context + prefix/suffix) and POSTs to `{model_url}/v1/completions` directly. Mock provider returns a static string when `model_url` is unset.
-5. **Telemetry.** After the inference returns, [`sidecar/src/telemetry.rs`](./sidecar/src/telemetry.rs) fires a detached POST to `{telemetry_url}/api/v1/telemetry/completions` with the full prompt+response+latency. Never blocks the editor.
+5. **Telemetry.** After the inference returns, [`sidecar/src/telemetry.rs`](./sidecar/src/telemetry.rs) fires a detached POST to `{telemetry_url}/api/v1/completions` with the full prompt+response+latency. Never blocks the editor.
 6. **Back.** The sidecar maps the inference result into a JSON-RPC response `{text, document_version}` → extension wraps it as a `vscode.InlineCompletionItem` → VS Code renders ghost text.
 
 ## Phoenix telemetry read API
 
-- `GET /api/v1/telemetry/completions` — 50 newest events (Bearer auth)
-- `GET /api/v1/telemetry/completions/{id}` — (not implemented; use the list endpoint)
-- `GET /api/v1/telemetry/stats` — `{count, avg_latency_ms, by_language, by_provider}`
+- `GET /api/v1/completions` — 50 newest events (Bearer auth)
+- `GET /api/v1/completions/{id}` — (not implemented; use the list endpoint)
+- `GET /api/v1/stats` — `{count, avg_latency_ms, by_language, by_provider}`
 
 Events are stored in-memory, capped at 500, newest-first. Phoenix restart wipes them.
 

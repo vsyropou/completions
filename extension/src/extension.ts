@@ -159,6 +159,8 @@ async function initializeAndSync() {
     model_api_key: cfg.get<string>("modelApiKey"),
     model: cfg.get<string>("model") || undefined,
     fim_template: cfg.get<string>("fimTemplate"),
+    temperature: cfg.get<number>("temperature"),
+    max_tokens: cfg.get<number>("maxTokens"),
   });
   for (const doc of vscode.workspace.textDocuments) {
     if (isSupported(doc)) syncOpen(doc);

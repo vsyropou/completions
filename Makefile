@@ -48,7 +48,7 @@ model-pull:
 		--hf-file "$(HF_FILE)" \
 		--prompt "" \
 		--n-predict 1 \
-		--no-conversation 2>&1 | tail -5
+		--no-warmup 2>&1 | tail -5
 
 model-stop:
 	-pkill -f "llama-server.*--port $(MODEL_PORT)"

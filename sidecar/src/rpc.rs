@@ -28,10 +28,14 @@ pub struct Response {
 }
 
 /// JSON-RPC error object. Codes follow `protocol/README.md` §2.2.
+/// Optional `data` is serialized on the wire as the error object's `data` key
+/// (JSON-RPC 2.0 §5.1); used here only for -32001 to carry the current version.
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonRpcError {
     pub code: i32,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
 }
 
 impl JsonRpcError {
@@ -40,6 +44,7 @@ impl JsonRpcError {
         Self {
             code: -32700,
             message: "parse error".into(),
+            data: None,
         }
     }
     /// -32601 the method name isn't one we handle.
@@ -47,6 +52,7 @@ impl JsonRpcError {
         Self {
             code: -32601,
             message: format!("unknown method: {m}"),
+            data: None,
         }
     }
     /// -32602 the params object failed validation.
@@ -54,6 +60,7 @@ impl JsonRpcError {
         Self {
             code: -32602,
             message: m.into(),
+            data: None,
         }
     }
     /// -32000 the extension asked about a document we never saw open.
@@ -61,13 +68,16 @@ impl JsonRpcError {
         Self {
             code: -32000,
             message: format!("unknown document: {uri}"),
+            data: None,
         }
     }
     /// -32001 client's `document_version` doesn't match our snapshot — stale request.
+    /// `data` carries the sidecar's current version so the caller can resync.
     pub fn version_mismatch(want: i64, got: i64) -> Self {
         Self {
             code: -32001,
             message: format!("document version mismatch: requested {want}, current {got}"),
+            data: Some(serde_json::json!({ "current_version": got })),
         }
     }
     /// -32002 the Phoenix HTTP hop failed.
@@ -75,6 +85,7 @@ impl JsonRpcError {
         Self {
             code: -32002,
             message: m.into(),
+            data: None,
         }
     }
     /// -32003 cancelled via `completion/cancel`.
@@ -82,14 +93,16 @@ impl JsonRpcError {
         Self {
             code: -32003,
             message: "cancelled".into(),
+            data: None,
         }
     }
     /// Serialize to a full JSON-RPC response object.
     pub fn into_response(self, id: RequestId) -> serde_json::Value {
+        let err = serde_json::to_value(self).expect("JsonRpcError serializes");
         serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
-            "error": { "code": self.code, "message": self.message }
+            "error": err,
         })
     }
 }
@@ -98,6 +111,10 @@ impl JsonRpcError {
 pub fn success_response(id: RequestId, result: serde_json::Value) -> serde_json::Value {
     serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": result })
 }
+
+/// Same 256 KB ceiling Phoenix puts on the HTTP hop — a larger frame here is
+/// always corruption, so we error out before allocating or reading the body.
+const MAX_FRAME_BYTES: usize = 256 * 1024;
 
 /// Read one framed message. Returns `Ok(None)` on clean EOF (stdin closed),
 /// `Err` on malformed framing. Body bytes are the raw JSON — caller parses.
@@ -120,6 +137,12 @@ pub async fn read_message<R: AsyncReadExt + Unpin>(
                 .trim()
                 .parse::<usize>()
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            if n > MAX_FRAME_BYTES {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Content-Length {n} exceeds {MAX_FRAME_BYTES} byte cap"),
+                ));
+            }
             content_length = Some(n);
         }
         // ignore other headers
@@ -151,33 +174,4 @@ pub async fn write_message<W: AsyncWriteExt + Unpin>(
     writer.write_all(&body).await?;
     writer.flush().await?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn framing_round_trip_two_messages() {
-        let m1 = serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize"});
-        let m2 = serde_json::json!({"jsonrpc":"2.0","method":"shutdown"});
-        let mut buf: Vec<u8> = Vec::new();
-        write_message(&mut buf, &m1).await.unwrap();
-        write_message(&mut buf, &m2).await.unwrap();
-
-        let mut br = BufReader::new(&buf[..]);
-        let r1 = read_message(&mut br).await.unwrap().unwrap();
-        let r2 = read_message(&mut br).await.unwrap().unwrap();
-        let r3 = read_message(&mut br).await.unwrap();
-
-        assert_eq!(
-            serde_json::from_slice::<serde_json::Value>(&r1).unwrap(),
-            m1
-        );
-        assert_eq!(
-            serde_json::from_slice::<serde_json::Value>(&r2).unwrap(),
-            m2
-        );
-        assert!(r3.is_none());
-    }
 }

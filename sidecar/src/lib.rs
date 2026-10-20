@@ -9,8 +9,10 @@ pub mod completion;
 pub mod context;
 pub mod documents;
 pub mod index;
+pub mod inference;
 pub mod rpc;
 pub mod syntax;
+pub mod telemetry;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -23,7 +25,7 @@ use rpc::{read_message, write_message, JsonRpcError, RequestId};
 /// Shared runtime configuration. Cheap to clone (Arc inside).
 #[derive(Clone)]
 pub struct Config {
-    pub(crate) inner: Arc<Mutex<Inner>>,
+    pub inner: Arc<Mutex<Inner>>,
 }
 
 /// The mutable fields behind `Config`. Lock, mutate, drop.
@@ -34,6 +36,10 @@ pub struct Inner {
     pub max_tokens_default: u32,
     pub measure_latency: bool,
     pub http: reqwest::Client,
+    pub model_url: Option<String>,
+    pub model_api_key: Option<String>,
+    pub model: Option<String>,
+    pub fim_template: Option<String>,
 }
 
 impl Default for Config {
@@ -51,6 +57,10 @@ impl Default for Config {
                 max_tokens_default: 128,
                 measure_latency: false,
                 http,
+                model_url: None,
+                model_api_key: None,
+                model: None,
+                fim_template: None,
             })),
         }
     }
@@ -77,13 +87,13 @@ impl Config {
 // One Mutex covers both fields so the contains+insert pair is atomic — otherwise
 // a cancel in the gap would emit -32003 AND the success reply for one id.
 #[derive(Default)]
-struct PendingState {
-    cancel: HashMap<i64, tokio::task::AbortHandle>,
-    answered: std::collections::HashSet<i64>,
+pub struct PendingState {
+    pub cancel: HashMap<i64, tokio::task::AbortHandle>,
+    pub answered: std::collections::HashSet<i64>,
 }
 
-struct Pending {
-    state: Mutex<PendingState>,
+pub struct Pending {
+    pub state: Mutex<PendingState>,
 }
 
 /// Run the JSON-RPC loop until `shutdown` or stdin EOF. Entry point called from `main`.
@@ -91,6 +101,7 @@ pub async fn run() {
     let config = Config::default();
     let documents: Documents = Documents::default();
     let index = index::Index::default();
+    let debounce = completion::Debounce::default();
     let pending = Arc::new(Pending {
         state: Mutex::new(PendingState::default()),
     });
@@ -107,9 +118,10 @@ pub async fn run() {
                 return;
             }
             Err(e) => {
-                tracing::warn!(%e, "framing read error");
-                write_err(&writer, RequestId::Null, JsonRpcError::parse_error()).await;
-                continue;
+                // Match the TS decoder: malformed framing is fatal. Log and exit
+                // non-zero instead of absorbing garbage and desynchronizing the stream.
+                tracing::error!(%e, "framing read error, exiting");
+                std::process::exit(1);
             }
         };
 
@@ -157,6 +169,7 @@ pub async fn run() {
                 let cfg = config.clone();
                 let docs = documents.clone();
                 let idx = index.clone();
+                let dbnc = debounce.clone();
                 let pnd = pending.clone();
                 let w = writer.clone();
                 let num_id = match &id {
@@ -165,7 +178,8 @@ pub async fn run() {
                 };
                 let task_id = id.clone();
                 let task = tokio::spawn(async move {
-                    let result = completion::handle_completion_request(cfg, docs, idx, val).await;
+                    let result =
+                        completion::handle_completion_request(cfg, docs, idx, val, dbnc).await;
                     // Atomic with the cancel handler: if the id was already answered (cancel
                     // raced us and won), drop the result and clean up. Otherwise claim the
                     // response slot so the cancel handler becomes a no-op.
@@ -222,10 +236,16 @@ pub async fn run() {
                 refresh_index_for_doc(&index, &config, val.get("params")).await;
             }
             ("textDocument/didChange", None) => {
-                documents
+                if let Err(e) = documents
                     .did_change(val.get("params").unwrap_or(&serde_json::Value::Null))
-                    .await;
-                refresh_index_for_doc(&index, &config, val.get("params")).await;
+                    .await
+                {
+                    // Leave the document untouched; the completion path will
+                    // -32001 against the stale server version.
+                    tracing::warn!(error = %e, "didChange rejected, document not updated");
+                } else {
+                    refresh_index_for_doc(&index, &config, val.get("params")).await;
+                }
             }
             ("textDocument/didClose", None) => {
                 documents
@@ -289,6 +309,22 @@ async fn handle_initialize(
         .get("measure_latency")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
+    let model_url = params
+        .get("model_url")
+        .and_then(|v| v.as_str())
+        .map(str::to_owned);
+    let model_api_key = params
+        .get("model_api_key")
+        .and_then(|v| v.as_str())
+        .map(str::to_owned);
+    let model = params
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(str::to_owned);
+    let fim_template = params
+        .get("fim_template")
+        .and_then(|v| v.as_str())
+        .map(str::to_owned);
 
     {
         let mut g = cfg.inner.lock().await;
@@ -297,6 +333,10 @@ async fn handle_initialize(
         g.workspace_root = workspace_root.clone();
         g.max_tokens_default = max_tokens;
         g.measure_latency = measure_latency;
+        g.model_url = model_url;
+        g.model_api_key = model_api_key;
+        g.model = model;
+        g.fim_template = fim_template;
     }
 
     // Spawn async workspace indexing — never block completions on it.
@@ -310,7 +350,12 @@ async fn handle_initialize(
         });
     }
 
-    Ok(serde_json::json!({ "capabilities": { "languages": ["typescript", "tsx"] } }))
+    Ok(serde_json::json!({ "capabilities": { "languages": [
+        "typescript", "tsx", "javascript", "jsx",
+        "python", "rust", "go", "java",
+        "c", "cpp", "csharp",
+        "elixir", "json", "yaml",
+    ] } }))
 }
 
 /// Convert a `file:///repo` URI to a filesystem path. `None` if empty.
@@ -342,14 +387,17 @@ async fn refresh_index_for_doc(
         .unwrap_or("typescript");
     let workspace_root = config.inner.lock().await.workspace_root.clone();
     let rel = repo_relative_str(&workspace_root, uri);
-    let Some(tree) = syntax::parse(syntax::Lang::from_language_id(lang_id), text) else {
-        return;
+    let lang = syntax::Lang::from_language_id(lang_id);
+    let rel_path = std::path::PathBuf::from(&rel);
+    // NoParser / Json / Yaml: content only (BM25). Symbols come from grammars we know.
+    let (symbols, imports_strs) = match syntax::parse(lang, text) {
+        Some(tree) => index::extract(lang, &tree, text),
+        None => (Vec::new(), Vec::new()),
     };
-    let (symbols, imports_strs) = index::extract(&tree, text);
-    // extract() returns resolved import strings (module specifiers), but our Index expects specifiers as-written.
     index
-        .set_file(std::path::PathBuf::from(&rel), symbols, imports_strs)
+        .set_file(rel_path.clone(), symbols, imports_strs)
         .await;
+    index.set_text(rel_path, text.to_owned()).await;
 }
 
 /// Strip the workspace prefix (or `file://`) off a URI to yield a repo-relative

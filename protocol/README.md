@@ -1,6 +1,15 @@
 # Completion Protocol — FROZEN v1
 
-Contract version: **v1.0** (frozen 2026-10-14). No field renames, endpoint changes, or coordinate changes without lead approval and a version bump.
+Contract version: **v1.1** (frozen 2026-10-15). No field renames, endpoint changes, or coordinate changes without lead approval and a version bump.
+
+## Changes in v1.1
+
+- `max_tokens` removed from `completion/request` params (already provided during `initialize` via `initialize.params.max_tokens`).
+- `max_tokens` removed from the Rust→Phoenix HTTP request body. Phoenix reads its inference budget from the `INFERENCE_MAX_TOKENS` env var; the sidecar still accepts it in `initialize` but no longer forwards it per-request.
+
+## Changes in v1.0
+
+Initial freeze (2026-10-14).
 
 ## 1. Overview
 
@@ -109,8 +118,7 @@ Full-document replacement only in v1.
   "params": {
     "document_uri": "file:///repo/src/main.ts",
     "document_version": 42,
-    "position": { "line": 10, "character": 8 },
-    "max_tokens": 128
+    "position": { "line": 10, "character": 8 }
   }
 }
 ```
@@ -194,8 +202,7 @@ Request:
   "file_path": "src/main.ts",
   "prefix": "function calculate() {\n",
   "suffix": "\n}",
-  "repository_context": "",
-  "max_tokens": 128
+  "repository_context": ""
 }
 ```
 
@@ -263,4 +270,4 @@ Error responses — consistent shape, JSON body:
 
 ---
 
-*End of frozen contract v1.0.*
+*End of frozen contract v1.1.*

@@ -1,20 +1,17 @@
 defmodule Complete.Application do
   @moduledoc """
-  OTP application entry point. Starts the supervision tree:
+  OTP application entry point. Supervision tree (one-for-one):
 
-    * `Finch` (HTTP client pool named `Complete.Finch`) — used only by
-      `Complete.FimAdapter` when `INFERENCE_BASE_URL` is set.
+    * `Complete.TelemetryStore` — in-memory telemetry event buffer.
     * `CompleteWeb.Endpoint` — the Phoenix HTTP endpoint serving
-      `POST /api/v1/completions`.
-
-  Both children restart independently under a `:one_for_one` strategy.
+      `/api/v1/telemetry/*`.
   """
   use Application
 
   @impl true
   def start(_type, _args) do
     children = [
-      {Finch, name: Complete.Finch},
+      Complete.TelemetryStore,
       CompleteWeb.Endpoint
     ]
 

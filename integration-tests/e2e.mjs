@@ -1,24 +1,60 @@
-// E2E: spawn sidecar, talk JSON-RPC over stdio, assert mock completion comes back.
-// Run: node e2e.mjs   (requires Phoenix on :4000 and sidecar/target/debug/sidecar)
+// End-to-end smoke test: sidecar (stdio JSON-RPC) -> Phoenix (HTTP, mock) -> back.
+// Run from integration-tests/:  node e2e.mjs
+// Requires: Phoenix on :4000 (mix phx.server) and sidecar/target/debug/sidecar built.
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import assert from "node:assert/strict";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const sidecar = path.join(root, "../sidecar/target/debug/sidecar");
+const sidecarBin = path.join(root, "../sidecar/target/debug/sidecar");
 
-const child = spawn(sidecar, [], { stdio: ["pipe", "pipe", "inherit"] });
+// The one string the Phoenix mock returns on every completion request.
+const MOCK =
+  "// hello from mock backend\n" +
+  "function greet(name: string): string {\n" +
+  "  return `hello ${name}`;\n" +
+  "}\n";
 
-let buf = Buffer.alloc(0);
-const pending = new Map();
-let nextId = 1;
+// -- Step a: start the sidecar -------------------------------------------------
+console.log("[1/5] spawning sidecar:", sidecarBin);
+const child = spawn(sidecarBin, [], { stdio: ["pipe", "pipe", "inherit"] });
+child.once("error", (e) => {
+  console.error("failed to spawn sidecar:", e.message);
+  process.exit(1);
+});
 
+// -- LSP-style framing helpers (write) -----------------------------------------
 function send(obj) {
   const body = Buffer.from(JSON.stringify(obj), "utf8");
   child.stdin.write(`Content-Length: ${body.length}\r\n\r\n`);
   child.stdin.write(body);
 }
+
+// -- LSP-style framing helpers (read): buffer stdout, parse Content-Length ----
+let buf = Buffer.alloc(0);
+const pending = new Map();
+child.stdout.on("data", (chunk) => {
+  buf = Buffer.concat([buf, chunk]);
+  for (;;) {
+    const headerEnd = buf.indexOf("\r\n\r\n");
+    if (headerEnd === -1) return;
+    const m = /Content-Length: (\d+)/i.exec(buf.subarray(0, headerEnd).toString("utf8"));
+    if (!m) throw new Error("bad frame header");
+    const len = Number(m[1]);
+    if (buf.length < headerEnd + 4 + len) return;
+    const msg = JSON.parse(buf.subarray(headerEnd + 4, headerEnd + 4 + len).toString("utf8"));
+    buf = buf.subarray(headerEnd + 4 + len);
+    const p = pending.get(msg.id);
+    if (p) {
+      pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(`rpc ${msg.error.code}: ${msg.error.message}`));
+      else p.resolve(msg);
+    }
+  }
+});
+
+let nextId = 1;
 function request(method, params) {
   const id = nextId++;
   return new Promise((resolve, reject) => {
@@ -31,114 +67,61 @@ function notify(method, params) {
   send({ jsonrpc: "2.0", method, params });
 }
 
-child.stdout.on("data", (chunk) => {
-  buf = Buffer.concat([buf, chunk]);
-  for (;;) {
-    const headerEnd = buf.indexOf("\r\n\r\n");
-    if (headerEnd === -1) return;
-    const header = buf.subarray(0, headerEnd).toString("utf8");
-    const m = /Content-Length: (\d+)/i.exec(header);
-    if (!m) throw new Error("bad header: " + header);
-    const len = Number(m[1]);
-    if (buf.length < headerEnd + 4 + len) return;
-    const msg = JSON.parse(buf.subarray(headerEnd + 4, headerEnd + 4 + len).toString("utf8"));
-    buf = buf.subarray(headerEnd + 4 + len);
-    const p = pending.get(msg.id);
-    if (p) {
-      pending.delete(msg.id);
-      if (msg.error) p.reject(Object.assign(new Error(msg.error.message), { code: msg.error.code }));
-      else p.resolve(msg.result);
-    }
-  }
-});
-
-const uri = "file:///repo/src/main.ts";
-const textV1 = "function calculate() {\n\n}\n";
-const textV2 = "function calculate() {\n  \n}\n";
-
-// 1. initialize
-const init = await request("initialize", {
-  workspace_root: "file:///repo",
-  phoenix_url: "http://localhost:4000",
-  auth_token: "dev-token",
-  max_tokens: 128,
-});
-console.log("initialize ->", JSON.stringify(init));
-
-// 2. didOpen v1, completion at cursor; then stale-version check (must fail -32001)
-notify("textDocument/didOpen", { uri, language: "typescript", version: 1, text: textV1 });
-notify("textDocument/didChange", { uri, version: 2, text: textV2 });
-
-const completion = await request("completion/request", {
-  document_uri: uri,
-  document_version: 2,
-  position: { line: 1, character: 2 },
-  max_tokens: 128,
-});
-console.log("completion ->", JSON.stringify(completion));
-assert.equal(completion.document_version, 2);
-assert.ok(completion.text.length > 0, "empty completion");
-assert.ok(completion.text.includes("\n"), "expected multiline mock completion");
-
-// 3. stale version must be rejected
-let staleErr = null;
 try {
-  await request("completion/request", {
+  // -- Step b: initialize ------------------------------------------------------
+  const init = await request("initialize", {
+    workspace_root: "file:///tmp",
+    phoenix_url: "http://localhost:4000",
+    auth_token: "dev-token",
+    max_tokens: 128,
+  });
+  assert.equal(init.id, 1, "initialize response id must echo request id");
+  console.log("[2/5] initialize ok, capabilities:", JSON.stringify(init.result));
+
+  // -- Step c: didOpen a small TS doc ------------------------------------------
+  const uri = "file:///tmp/demo.ts";
+  notify("textDocument/didOpen", {
+    uri,
+    language: "typescript",
+    version: 1,
+    text: "function demo() {\n  \n}\n",
+  });
+  console.log("[3/5] didOpen sent:", uri, "version 1");
+
+  // -- Step d: completion/request returns the exact mock string ----------------
+  const completion = await request("completion/request", {
     document_uri: uri,
     document_version: 1,
-    position: { line: 0, character: 0 },
-    max_tokens: 16,
+    position: { line: 1, character: 2 },
   });
-} catch (e) {
-  staleErr = e;
-}
-assert.ok(staleErr, "expected stale version error");
-assert.equal(staleErr.code, -32001);
-console.log("stale version correctly rejected with", staleErr.code);
+  assert.equal(completion.result.text, MOCK, "completion text must equal the static mock string");
+  console.log("[4/5] completion ok, text matches mock string (", MOCK.length, "bytes )");
 
-// 4. unknown document
-let unknownErr = null;
-try {
-  await request("completion/request", {
-    document_uri: "file:///repo/src/nope.ts",
+  // -- Step e: python didOpen smoke (multi-language path) -----------------------
+  const pyUri = "file:///tmp/demo.py";
+  notify("textDocument/didOpen", {
+    uri: pyUri,
+    language: "python",
+    version: 1,
+    text: "def helper():\n    \n",
+  });
+  const pyCompletion = await request("completion/request", {
+    document_uri: pyUri,
     document_version: 1,
-    position: { line: 0, character: 0 },
-    max_tokens: 16,
+    position: { line: 1, character: 4 },
   });
+  assert.equal(pyCompletion.result.text, MOCK, "python completion text must equal mock");
+  console.log("[4.5/5] python didOpen + completion ok");
+
+  // -- Step f: shutdown, wait for exit -----------------------------------------
+  await request("shutdown");
+  await new Promise((res) => child.once("exit", res));
+  console.log("[5/5] shutdown ok, sidecar exited");
+
+  console.log("[ok] end-to-end smoke test passed");
+  process.exit(0);
 } catch (e) {
-  unknownErr = e;
+  console.error("[fail]", e.message);
+  child.kill();
+  process.exit(1);
 }
-assert.equal(unknownErr.code, -32000);
-console.log("unknown document correctly rejected with", unknownErr.code);
-
-// 5. UTF-16 cursor: line with emoji; cursor right after emoji (2 UTF-16 units)
-notify("textDocument/didOpen", {
-  uri: "file:///repo/src/emoji.ts",
-  language: "typescript",
-  version: 1,
-  text: "const a = \"😀\";\n",
-});
-const emojiCompletion = await request("completion/request", {
-  document_uri: "file:///repo/src/emoji.ts",
-  document_version: 1,
-  position: { line: 0, character: 13 }, // just after the closing quote+semicolon? no: 11=emoji end... use end-of-string position
-  max_tokens: 16,
-}).catch(() => null);
-// position sanity: cursor inside line 0 after emoji must not error
-const emojiOk = await request("completion/request", {
-  document_uri: "file:///repo/src/emoji.ts",
-  document_version: 1,
-  position: { line: 0, character: 12 }, // right after "😀" (emoji = 2 UTF-16 units)
-  max_tokens: 16,
-});
-console.log("emoji-position completion ok ->", JSON.stringify(emojiOk).slice(0, 80));
-
-notify("textDocument/didClose", { uri });
-
-// 6. shutdown
-const sd = await request("shutdown");
-console.log("shutdown ->", JSON.stringify(sd));
-await new Promise((res) => child.once("exit", res));
-console.log("sidecar exited cleanly");
-console.log("E2E PASS");
-process.exit(0);

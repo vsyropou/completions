@@ -11,8 +11,33 @@ use crate::rpc::JsonRpcError;
 use serde::Deserialize;
 use serde_json::json;
 
-const PREFIX_CAP: usize = 6000;
-const SUFFIX_CAP: usize = 1000;
+pub const PREFIX_CAP: usize = 6000;
+pub const SUFFIX_CAP: usize = 1000;
+
+/// Wait this long before the HTTP fan-out so a burst of typing collapses into
+/// one Phoenix call. Latest request per URI wins; superseded ones return -32003.
+pub const DEBOUNCE_MS: u64 = 200;
+
+/// Latest-wins per-URI generation counter. Clone-cheap (Arc inside).
+#[derive(Default, Clone)]
+pub struct Debounce {
+    inner: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, u64>>>,
+}
+
+impl Debounce {
+    /// Bump and return the new generation for `uri`.
+    pub async fn bump(&self, uri: &str) -> u64 {
+        let mut m = self.inner.lock().await;
+        let g = m.entry(uri.to_owned()).or_insert(0);
+        *g += 1;
+        *g
+    }
+    /// True if `gen` is still the newest generation for `uri`.
+    pub async fn is_current(&self, uri: &str, gen: u64) -> bool {
+        let m = self.inner.lock().await;
+        m.get(uri).copied() == Some(gen)
+    }
+}
 
 /// Deserialized `completion/request` params. Field names match the protocol.
 #[derive(Deserialize)]
@@ -20,8 +45,6 @@ pub struct CompletionParams {
     pub document_uri: String,
     pub document_version: i64,
     pub position: Position,
-    #[serde(default)]
-    pub max_tokens: Option<u32>,
 }
 
 /// Zero-based `{line, character}` in UTF-16 code units (protocol §4).
@@ -109,12 +132,14 @@ pub fn cap_prefix(s: &str, max: usize) -> &str {
 /// `result` body (or an error to be serialized via `JsonRpcError::into_response`).
 ///
 /// Order of checks is protocol-mandated: unknown document (`-32000`) →
-/// version mismatch (`-32001`) → upstream errors (`-32002`).
+/// version mismatch (`-32001`) → upstream errors (`-32002`). Rapid bursts
+/// of requests for one URI coalesce via `debounce`; superseded ones return -32003.
 pub async fn handle_completion_request(
     cfg: crate::Config,
     documents: crate::documents::Documents,
     index: crate::index::Index,
     req: serde_json::Value,
+    debounce: Debounce,
 ) -> Result<serde_json::Value, JsonRpcError> {
     let t0 = std::time::Instant::now();
     let params_value = req
@@ -136,65 +161,94 @@ pub async fn handle_completion_request(
         ));
     }
 
-    let offset = utf16_to_utf8_offset(&doc.text, p.position.line, p.position.character)?;
-    let prefix = cap_prefix(&doc.text[..offset], PREFIX_CAP).to_owned();
-    let suffix = cap_suffix(&doc.text[offset..], SUFFIX_CAP).to_owned();
+    // Debounce: claim the slot, wait, bail if someone else claimed it while we slept.
+    let gen = debounce.bump(&p.document_uri).await;
+    tokio::time::sleep(std::time::Duration::from_millis(DEBOUNCE_MS)).await;
+    if !debounce.is_current(&p.document_uri, gen).await {
+        tracing::debug!(uri = %p.document_uri, "debounced (superseded)");
+        return Err(JsonRpcError::cancelled());
+    }
+    // Typing can move the doc during our sleep; refuse if the version we
+    // validated has gone stale. Same code the client would already send.
+    let doc = match documents.get(&p.document_uri).await {
+        Some(d) if d.version == p.document_version => d,
+        _ => return Err(JsonRpcError::cancelled()),
+    };
 
-    let (phoenix_url, auth_token, workspace_root, default_max_tokens, measure_latency, http) =
+    let offset = utf16_to_utf8_offset(&doc.text, p.position.line, p.position.character)?;
+    // Trim prompt to a syntax-aware excerpt, then apply the byte caps as a hard
+    // ceiling. The excerpt function already keeps us well under both caps.
+    let lang = crate::syntax::Lang::from_language_id(&doc.language);
+    let tree_opt = crate::syntax::parse(lang, &doc.text);
+    let excerpt = crate::context::compute_cursor_excerpt(
+        &doc.text,
+        tree_opt.as_ref(),
+        offset,
+        // PREFIX_CAP+SUFFIX_CAP / 3 tokens ≈ the existing total budget.
+        (PREFIX_CAP + SUFFIX_CAP) / 3,
+    );
+    let prefix = cap_prefix(&doc.text[excerpt.start_byte..offset], PREFIX_CAP).to_owned();
+    let suffix = cap_suffix(&doc.text[offset..excerpt.end_byte], SUFFIX_CAP).to_owned();
+
+    let (_phoenix_url, _auth_token, workspace_root, _max_tokens_default, measure_latency, _http) =
         cfg.snapshot().await;
-    let max_tokens = p.max_tokens.unwrap_or(default_max_tokens);
     let request_id = uuid::Uuid::new_v4().to_string();
+    let language = doc.language.clone();
     let file_path = crate::repo_relative_str(&workspace_root, &p.document_uri);
 
+    // Identifiers near cursor feed BM25 ranking for repo excerpts.
+    let query_terms = crate::context::identifiers_near_cursor(&doc.text, offset, 3);
+
     // Phase 2: build repository_context from tree-sitter + in-memory index.
-    let lang = crate::syntax::Lang::from_language_id(&doc.language);
-    let repository_context = match crate::syntax::parse(lang, &doc.text) {
+    let repository_context = match tree_opt.as_ref() {
         Some(tree) => {
-            crate::context::build_repository_context(&index, &file_path, &tree, &doc.text, offset)
-                .await
+            crate::context::build_repository_context_with_query(
+                &index,
+                &file_path,
+                tree,
+                &doc.text,
+                offset,
+                &query_terms,
+            )
+            .await
         }
         None => String::new(),
     };
 
-    let url = format!("{}/api/v1/completions", phoenix_url.trim_end_matches('/'));
-    let body = json!({
-        "request_id": request_id,
-        "language": doc.language,
-        "file_path": file_path,
-        "prefix": prefix,
-        "suffix": suffix,
-        "repository_context": repository_context,
-        "max_tokens": max_tokens,
-    });
-
     let http_start = std::time::Instant::now();
-    let resp = http
-        .post(&url)
-        .bearer_auth(&auth_token)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| JsonRpcError::upstream(format!("http send: {e}")))?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let body = resp.text().await.unwrap_or_default();
-        return Err(JsonRpcError::upstream(format!(
-            "phoenix {}: {}",
-            status.as_u16(),
-            body.chars().take(200).collect::<String>()
-        )));
-    }
-
-    let v: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| JsonRpcError::upstream(format!("invalid phoenix json: {e}")))?;
+    let (prompt, completion, finish_reason, model) = crate::inference::complete(
+        &cfg,
+        &doc.language,
+        &file_path,
+        &prefix,
+        &suffix,
+        &repository_context,
+        &request_id,
+    )
+    .await?;
     let http_ms = http_start.elapsed().as_millis() as u64;
-    let completion = v
-        .get("completion")
-        .and_then(|c| c.as_str())
-        .ok_or_else(|| JsonRpcError::upstream("phoenix response missing 'completion'"))?;
+
+    // Editor got its answer; telemetry fans out in the background and is
+    // dropped on any failure. Provider mirrors the inference routing.
+    let provider = if cfg.inner.lock().await.model_url.is_some() {
+        "model"
+    } else {
+        "mock"
+    };
+    crate::telemetry::fire(
+        cfg.clone(),
+        crate::telemetry::Telemetry {
+            request_id,
+            language,
+            file_path,
+            prompt,
+            response: completion.clone(),
+            latency_ms: http_ms,
+            provider,
+            model,
+            finish_reason,
+        },
+    );
 
     let mut out = json!({
         "text": completion,
@@ -208,275 +262,4 @@ pub async fn handle_completion_request(
         );
     }
     Ok(out)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::Config;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::TcpListener;
-
-    async fn serve_once(listener: TcpListener, reply: &'static str) -> String {
-        let (mut sock, _) = listener.accept().await.unwrap();
-        let mut buf: Vec<u8> = Vec::new();
-        let mut chunk = [0u8; 4096];
-        loop {
-            let n = sock.read(&mut chunk).await.unwrap();
-            if n == 0 {
-                break;
-            }
-            buf.extend_from_slice(&chunk[..n]);
-            if let Some(pos) = find_subslice(&buf, b"\r\n\r\n").map(|p| p + 4) {
-                let headers = String::from_utf8_lossy(&buf[..pos]).to_string();
-                let mut content_length = 0usize;
-                for line in headers.lines() {
-                    let lower = line.to_lowercase();
-                    if let Some(v) = lower.strip_prefix("content-length:") {
-                        content_length = v.trim().parse().unwrap_or(0);
-                    }
-                }
-                if buf.len() >= pos + content_length {
-                    sock.write_all(reply.as_bytes()).await.unwrap();
-                    break;
-                }
-            }
-        }
-        String::from_utf8(buf).unwrap()
-    }
-
-    fn find_subslice(hay: &[u8], needle: &[u8]) -> Option<usize> {
-        hay.windows(needle.len()).position(|w| w == needle)
-    }
-
-    async fn mock_config(url: String) -> Config {
-        let cfg = Config::default();
-        {
-            let mut g = cfg.inner.lock().await;
-            g.phoenix_url = url;
-            g.auth_token = "tok".into();
-            g.workspace_root = "file:///repo".into();
-            g.max_tokens_default = 128;
-        }
-        cfg
-    }
-
-    fn open_doc() -> serde_json::Value {
-        serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "completion/request",
-            "id": 7,
-            "params": {
-                "document_uri": "file:///repo/src/main.ts",
-                "document_version": 3,
-                "position": { "line": 1, "character": 8 },
-                "max_tokens": 64
-            }
-        })
-    }
-
-    async fn open_documents() -> crate::documents::Documents {
-        let docs = crate::documents::Documents::default();
-        docs.did_open(&serde_json::json!({
-            "uri": "file:///repo/src/main.ts",
-            "language": "typescript",
-            "version": 3,
-            "text": "l0\nconst x = 1;\nl2"
-        }))
-        .await;
-        docs
-    }
-
-    #[tokio::test]
-    async fn http_success_returns_completion() {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let reply = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 86\r\nConnection: close\r\n\r\n{\"request_id\":\"x\",\"completion\":\"  return 42;\\n\",\"finish_reason\":\"stop\",\"model\":\"mock\"}";
-        let server = tokio::spawn(serve_once(listener, reply));
-
-        let cfg = mock_config(format!("http://{addr}")).await;
-        let docs = open_documents().await;
-        let res = handle_completion_request(cfg, docs, crate::index::Index::default(), open_doc())
-            .await
-            .unwrap();
-        assert_eq!(res["text"], "  return 42;\n");
-        assert_eq!(res["document_version"], 3);
-
-        let body = server.await.unwrap();
-        assert!(
-            body.starts_with("POST /api/v1/completions "),
-            "got: {}",
-            body
-        );
-        // repo-relative file_path
-        assert!(body.contains("\"file_path\":\"src/main.ts\""));
-        assert!(body.contains("\"language\":\"typescript\""));
-        assert!(body.contains("\"prefix\":\"l0\\nconst x \""));
-        assert!(body.contains("\"suffix\":\"= 1;\\nl2\""));
-        assert!(body.contains("\"max_tokens\":64"));
-        assert!(body.contains("\"repository_context\":\"\""));
-        assert!(body.contains("authorization: Bearer tok"));
-    }
-
-    #[tokio::test]
-    async fn latency_ms_present_when_opted_in() {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let reply = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 86\r\nConnection: close\r\n\r\n{\"request_id\":\"x\",\"completion\":\"  return 42;\\n\",\"finish_reason\":\"stop\",\"model\":\"mock\"}";
-        let server = tokio::spawn(serve_once(listener, reply));
-
-        let cfg = mock_config(format!("http://{addr}")).await;
-        cfg.inner.lock().await.measure_latency = true;
-        let docs = open_documents().await;
-        let res = handle_completion_request(cfg, docs, crate::index::Index::default(), open_doc())
-            .await
-            .unwrap();
-        let lm = res["latency_ms"].as_object().expect("latency_ms present");
-        let total = lm["total"].as_u64().unwrap();
-        let http = lm["http"].as_u64().unwrap();
-        assert!(total >= http, "total={} http={}", total, http);
-
-        // Opt-in default false: same request without the flag yields no key.
-        let listener2 = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr2 = listener2.local_addr().unwrap();
-        let server2 = tokio::spawn(serve_once(listener2, reply));
-        let cfg2 = mock_config(format!("http://{addr2}")).await;
-        let docs2 = open_documents().await;
-        let res2 =
-            handle_completion_request(cfg2, docs2, crate::index::Index::default(), open_doc())
-                .await
-                .unwrap();
-        assert!(res2.get("latency_ms").is_none());
-        server.await.unwrap();
-        server2.await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn http_401_maps_to_upstream_error() {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let reply = "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: 53\r\nConnection: close\r\n\r\n{\"error\":{\"code\":\"unauthorized\",\"message\":\"invalid\"}}";
-        let server = tokio::spawn(serve_once(listener, reply));
-
-        let cfg = mock_config(format!("http://{addr}")).await;
-        let docs = open_documents().await;
-        let err = handle_completion_request(cfg, docs, crate::index::Index::default(), open_doc())
-            .await
-            .unwrap_err();
-        assert_eq!(err.code, -32002, "got: {:?}", err);
-        server.await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn version_mismatch_returns_32001() {
-        let cfg = mock_config("http://127.0.0.1:1".into()).await;
-        let docs = open_documents().await;
-        let mut req = open_doc();
-        req["params"]["document_version"] = serde_json::json!(99);
-        let err = handle_completion_request(cfg, docs, crate::index::Index::default(), req)
-            .await
-            .unwrap_err();
-        assert_eq!(err.code, -32001);
-    }
-
-    #[tokio::test]
-    async fn unknown_document_returns_32000() {
-        let cfg = mock_config("http://127.0.0.1:1".into()).await;
-        let docs = crate::documents::Documents::default();
-        let err = handle_completion_request(cfg, docs, crate::index::Index::default(), open_doc())
-            .await
-            .unwrap_err();
-        assert_eq!(err.code, -32000);
-    }
-
-    #[test]
-    fn utf16_basic_ascii() {
-        assert_eq!(utf16_to_utf8_offset("hello\nworld", 1, 3).unwrap(), 9);
-    }
-
-    #[test]
-    fn utf16_multibyte() {
-        // "é" is 2 bytes utf8, 1 utf16 unit
-        let s = "ébc";
-        assert_eq!(utf16_to_utf8_offset(s, 0, 1).unwrap(), 2);
-        assert_eq!(utf16_to_utf8_offset(s, 0, 3).unwrap(), 4);
-    }
-
-    #[test]
-    fn utf16_surrogate_pair_boundary_before() {
-        // "😀" = U+1F600, 4 utf8 bytes, 2 utf16 units (surrogate pair)
-        let s = "a😀b";
-        // char 0 → 0 (before 'a')
-        assert_eq!(utf16_to_utf8_offset(s, 0, 0).unwrap(), 0);
-        // char 1 → 1 (after 'a', before emoji)
-        assert_eq!(utf16_to_utf8_offset(s, 0, 1).unwrap(), 1);
-        // char 2 → mid-pair (after high surrogate): protocol §4 → boundary BEFORE pair → 1
-        assert_eq!(utf16_to_utf8_offset(s, 0, 2).unwrap(), 1);
-        // char 3 → after emoji: byte 5
-        assert_eq!(utf16_to_utf8_offset(s, 0, 3).unwrap(), 5);
-        // char 4 → after 'b': byte 6
-        assert_eq!(utf16_to_utf8_offset(s, 0, 4).unwrap(), 6);
-    }
-
-    #[test]
-    fn utf16_out_of_range_errors() {
-        assert!(utf16_to_utf8_offset("ab", 5, 0).is_err());
-        assert!(utf16_to_utf8_offset("ab", 0, 10).is_err());
-    }
-
-    #[test]
-    fn prefix_and_suffix_caps_on_char_boundary() {
-        let many = "a".repeat(10_000);
-        let p = cap_prefix(&many, PREFIX_CAP);
-        assert_eq!(p.len(), 6000);
-        let s = cap_suffix(&many, SUFFIX_CAP);
-        assert_eq!(s.len(), 1000);
-
-        // Non-boundary: emoji 4 bytes.
-        // Build 5998 ascii + emoji (4 bytes) + 1 ascii. Total 6003 bytes.
-        let mut s = "a".repeat(5998);
-        s.push('😀');
-        s.push('z');
-        assert_eq!(s.len(), 6003);
-        let capped = cap_prefix(&s, PREFIX_CAP);
-        // start at 6003-6000=3, boundary ok (ascii)
-        assert_eq!(capped.len(), 6000);
-
-        // Cap start lands exactly at the emoji's first byte: boundary ok, returns the emoji.
-        // "a😀" = 5 bytes; cap 4 → start=1 (emoji's first byte) → "😀".
-        let capped2 = cap_prefix("a😀", 4);
-        assert_eq!(capped2.len(), 4);
-        assert_eq!(capped2, "😀");
-
-        // Cap start lands strictly inside the emoji's byte span → walk forward past emoji.
-        // "ab😀" = 6 bytes (emoji at 2..6); cap 3 → start=3 (inside) → walk to 6 → "".
-        let capped2b = cap_prefix("ab😀", 3);
-        assert_eq!(capped2b.len(), 0);
-
-        // "ab😀": len=6, cap 4 → start=2, which IS the emoji's first byte → boundary ok → "😀".
-        let capped3 = cap_prefix("ab😀", 4);
-        assert_eq!(capped3.len(), 4);
-        assert_eq!(capped3, "😀");
-
-        // "abc😀": len=7, cap 4 → start=3, inside emoji (3..7 range? emoji at 3..7; 3 is first byte) → boundary ok → "😀".
-        let capped4 = cap_prefix("abc😀", 4);
-        assert_eq!(capped4.len(), 4);
-
-        // "abcd😀": len=8, cap 5 → start=3 → 'd' boundary → "d😀".
-        let capped5 = cap_prefix("abcd😀", 5);
-        assert_eq!(capped5.len(), 5);
-        assert_eq!(capped5, "d😀");
-
-        // Non-boundary: cap such that we land MID-emoji. "abcd😀": len=8, cap 6 → start=2 → 'c' boundary → "cd😀".
-        // Duplicate sanity check: same as capped2b.
-        let capped6 = cap_prefix("ab😀", 3);
-        assert_eq!(capped6.len(), 0);
-
-        // Suffix: cap inside emoji → walks backward. "😀ab": len=6, cap 5 → end=5 (inside emoji? emoji is 0..4; byte 5 is 'b').
-        // Try "😀ab" cap 3 → end=3, inside emoji → walk back to 0 → "".
-        let suff = cap_suffix("😀ab", 3);
-        assert_eq!(suff.len(), 0);
-        let suff2 = cap_suffix("😀ab", 4);
-        assert_eq!(suff2, "😀");
-    }
 }

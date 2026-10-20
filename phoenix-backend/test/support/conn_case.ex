@@ -1,6 +1,8 @@
 defmodule CompleteWeb.ConnCase do
-  @moduledoc false
-
+  @moduledoc """
+  Test case template for endpoint-level tests. Builds a conn via
+  `Phoenix.ConnTest`, routes through `CompleteWeb.Endpoint`.
+  """
   use ExUnit.CaseTemplate
 
   using do

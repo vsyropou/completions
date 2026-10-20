@@ -1,172 +1,58 @@
-# code-completion
+# code-completion — learning skeleton
 
-Low-latency multiline code completion in VS Code, backed by a custom pipeline. A Rust **sidecar** process per editor window keeps file state and index in memory, builds the prompt, and posts it to a **Phoenix** backend, which calls a FIM model (or a deterministic mock when no GPU is attached) and returns a completion that VS Code renders as ghost text.
+A three-process code-completion pipeline you can read end-to-end. Skeleton state: plumbing is real, intelligence is placeholder. Typing in VS Code triggers a request that flows Extension → Rust sidecar → Phoenix → static mock response → ghost text in the editor.
 
 ```
-VS Code extension ──JSON-RPC 2.0 over stdio──▶ Rust sidecar ──HTTP/JSON──▶ Phoenix ──HTTP──▶ Inference (vLLM / SGLang)
-        ◀──────────── ghost text ────────────             ◀──────── completion ──────
+VS Code extension (TS) ──JSON-RPC 2.0/stdio──▶ Rust sidecar ──HTTP/JSON──▶ Phoenix (Elixir) ──▶ static mock
 ```
 
-Architecture details: [docs/architecture.md](./docs/architecture.md). Wire contract: [protocol/README.md](./protocol/README.md) (frozen v1.0).
+Full contract (the "real" system you'll grow toward): [protocol/README.md](./protocol/README.md), [docs/architecture.md](./docs/architecture.md).
 
-## Quickstart (mock mode, no GPU)
+## Install
 
-Three terminals, repos sibling-cloned under `code-completion/`.
-
-### 1. Phoenix backend
+Three sibling dirs, each with its own toolchain. Elixir/Erlang versions pinned in `phoenix-backend/.tool-versions` (erlang 28.2, elixir 1.18.4-otp-28) — install via asdf/mise first.
 
 ```sh
-cd phoenix-backend
-mix deps.get
-mix phx.server
+cd phoenix-backend && mix setup                          # deps.get
+cd ../sidecar && cargo build                             # debug binary
+cd ../vscode-extension && npm install && npm run compile # compile TS
 ```
 
-Runs on `http://localhost:4000`. With `INFERENCE_BASE_URL` unset, it serves deterministic mock completions. Dev default auth token is `dev-token`.
-
-### 2. Rust sidecar
-
+Gotcha — if `cargo` fails with "Bad CPU type in executable": `/usr/local/bin/cargo` is stale. Use rustup's instead:
 ```sh
-cd sidecar
-cargo build
+export PATH="$HOME/.cargo/bin:$PATH"
 ```
 
-Binary lands at `sidecar/target/debug/sidecar`.
+## Run
 
-### 3. VS Code extension
+Three terminals, plus a VS Code dev-host window:
 
-```sh
-cd vscode-extension
-npm install
-npm run compile
-```
+1. **Phoenix** — `cd phoenix-backend && mix phx.server` (port 4000, code-reloader on).
+2. **Sidecar** — nothing to start by hand; the VS Code extension spawns one per window.
+3. **Extension** — open `vscode-extension/` in VS Code, press **F5** to launch an Extension Development Host. In its settings set `completion.sidecarPath` to the absolute path of `sidecar/target/debug/sidecar`. In the dev-host, open a `.ts` file and type — you should see a static ghost-text suggestion appear.
+4. **Headless smoke check** — with Phoenix running and the sidecar built:
+   ```sh
+   node integration-tests/e2e.mjs
+   ```
+   Drives the sidecar over stdio without an editor and asserts the mock response round-trips.
 
-Point the extension at the debug binary — open VS Code settings (JSON) and set:
+## Follow the completion's journey
 
-```json
-"completion.sidecarPath": "/absolute/path/to/code-completion/sidecar/target/debug/sidecar"
-```
+The mock returns one fixed string: `// hello from mock backend` followed by a small `greet` function. Grep that string to find every hop:
 
-(In the Extension Development Host, use its own settings — `File → Preferences → Settings` while focused on the dev-host window.)
+1. **You type a `.ts` snippet.** VS Code fires `provideInlineCompletionItems` on our provider → `vscode-extension/src/extension.ts`. The extension forwards the document body to the sidecar via `didOpen` / `didChange` notifications, then sends a `completion/request`.
+2. **Framing.** The request isn't a plain string — it's `Content-Length: N\r\n\r\n` + a JSON-RPC 2.0 envelope over stdin/stdout. See `vscode-extension/src/framing.ts` on the writer side and `sidecar/src/rpc.rs` on the reader side.
+3. **Dispatch.** `sidecar/src/main.rs` → `lib.rs::run` reads frames, dispatches on `method` — `initialize`, `didOpen`/`didChange`/`didClose` (document store in `documents.rs`), `completion/request` (entry into `completion.rs`), `completion/cancel`, `shutdown`. Everything the dispatch does on top of that is `// placeholder:` — this is where tree-sitter parsing, repo indexing, prompt building, and version checks will live.
+4. **HTTP hop.** `completion.rs` builds the body (`prefix`, `suffix`, `repository_context`, `max_tokens`, `request_id`) and posts to `http://localhost:4000/api/v1/completions` with `Authorization: Bearer dev-token`. Auth must match Phoenix's `AUTH_TOKEN` env.
+5. **Phoenix.** `lib/complete_web/router.ex` → `CompletionController.create/2` (auth plug → validation → `CompletionGateway.generate/1` → `MockProvider.generate/1`). `MockProvider` returns the static string. Watch the Phoenix console — you'll see the request logged.
+6. **Back the same way.** Phoenix responds `{request_id, completion, finish_reason, model}` → sidecar parses, maps to JSON-RPC result `{text, document_version}` → extension inserts the `text` as a `vscode.InlineCompletionItem` and VS Code renders it as ghost text.
 
-Then: open `vscode-extension/` in VS Code, press **F5**. An Extension Development Host launches. Inside it, open any `.ts` file, type e.g. `function add(a, b) {` and pause — a multiline ghost text completion appears.
+Things to look at while learning:
+- `vscode-extension/src/extension.ts` — single file, the whole VS Code side.
+- `sidecar/src/rpc.rs` — how to read `Content-Length`-framed JSON-RPC off stdin in Rust.
+- `sidecar/src/lib.rs` — the dispatch loop that ties rpc/documents/completion together.
+- `phoenix-backend/lib/complete_web/controllers/completion_controller.ex` — clean Elixir `with`-chain for validation.
 
-## Verify mock end-to-end
+## Where the placeholders live
 
-With Phoenix running and the sidecar built:
-
-```sh
-node integration-tests/e2e.mjs
-```
-
-Expected output ends with:
-
-```
-initialize -> {"capabilities":...}
-completion -> {"text":"...","document_version":2}
-stale version correctly rejected with -32001
-unknown document correctly rejected with -32000
-emoji-position completion ok -> ...
-shutdown -> null
-sidecar exited cleanly
-E2E PASS
-```
-
-## Surfacing code changes
-
-| You edited | To pick it up |
-|---|---|
-| Rust sidecar (`sidecar/src/*.rs`) | `cargo build`, then in the dev-host window run **Developer: Reload Window** — the extension respawns the sidecar from the new binary |
-| Phoenix (`phoenix-backend/lib/**/*.ex`) | Nothing — `code_reloader: true` in dev, next HTTP request compiles + runs the new code |
-| Extension (`vscode-extension/src/*.ts`) | `npm run compile`, then reload the Extension Development Host window (`Cmd+R` in that window, or restart the F5 launch) |
-
-## Real FIM inference (optional, needs a GPU host)
-
-Serve the model with an OpenAI-compatible endpoint. vLLM:
-
-```sh
-python -m vllm.entrypoints.openai.api_server \
-  --model Qwen/Qwen2.5-Coder-32B-Instruct \
-  --port 8000
-```
-
-Or SGLang:
-
-```sh
-python -m sglang.launch_server \
-  --model-path Qwen/Qwen2.5-Coder-32B-Instruct \
-  --port 8000
-```
-
-Then restart Phoenix pointed at it:
-
-```sh
-export INFERENCE_BASE_URL=http://localhost:8000
-# optional overrides:
-# export INFERENCE_MODEL=Qwen/Qwen2.5-Coder-32B-Instruct
-# export INFERENCE_FIM_TEMPLATE='<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>'
-# export INFERENCE_MAX_TOKENS=512 INFERENCE_TEMPERATURE=0.0 INFERENCE_TIMEOUT_MS=25000
-mix phx.server
-```
-
-`Complete.CompletionGateway` switches from `MockProvider` to `FimAdapter` based on `INFERENCE_BASE_URL` being set ([phoenix-backend/lib/complete/completion_gateway.ex](./phoenix-backend/lib/complete/completion_gateway.ex)).
-
-## Watching latency
-
-In the dev-host settings:
-
-```json
-"completion.measureLatency": true
-```
-
-Then **View → Output**, pick the **Completion Sidecar** channel, and watch for lines like:
-
-```
-[latency] total=42ms rust_total=40ms rust_http=38ms
-```
-
-For aggregate numbers over 50 requests (Phoenix + sidecar up, sidecar not attached to an editor):
-
-```sh
-node integration-tests/latency.mjs
-# prints n, mean, p50, p95, p99 for total / rust_all / rust_http
-```
-
-## Debugging checklist
-
-Work top-down; the first matching symptom usually names the broken hop.
-
-1. **No ghost text at all.**
-   - **View → Output → "Completion Sidecar"** — see `sidecar binary not found: …`? Fix `completion.sidecarPath`.
-   - See `sidecar spawn error` or `sidecar exited: code=…`? Run the same binary by hand to see stderr.
-   - Nothing in Output at all? Extension didn't activate — open a `.ts` file (activation is `onLanguage:typescript` / `typescriptreact`).
-2. **`initialize failed: …` in Output.** Extension can't reach the sidecar. Check the binary runs standalone: `sidecar/target/debug/sidecar` should sit silently waiting on stdin (`Ctrl+C` to kill).
-3. **HTTP 401 / `unauthorized` in Phoenix log.** Token mismatch. Extension setting `completion.authToken` must equal `AUTH_TOKEN` env (or fall back to the shared dev default `dev-token`).
-4. **HTTP 502 `upstream_error` / 504 `upstream_timeout`.** Inference server down or unreachable. Confirm `curl $INFERENCE_BASE_URL/v1/models` responds; check `INFERENCE_BASE_URL` / `INFERENCE_MODEL` against what the GPU host actually exposes.
-5. **Completions appear but feel stale / off-by-one.** Check `document_version` in sidecar trace logs against the editor: sidecar rejects mismatches with `-32001`. If the editor is at version 43 and the sidecar insists on 42, a `didChange` was dropped — reload the window and watch Output for `restarting sidecar once after 1s`.
-6. **`-32000 unknown document`.** Sidecar hasn't seen the file. Make sure it's open in the editor and matches a language in `LANGUAGE_MAP` ([vscode-extension/src/extension.ts](./vscode-extension/src/extension.ts)).
-
-## Project layout
-
-```
-code-completion/
-├── protocol/                Frozen v1.0 wire contract (JSON-RPC + HTTP)
-│   └── README.md            — do not edit; see lead for changes
-├── vscode-extension/        TypeScript extension (F5 dev loop)
-│   └── README.md            Extension-specific notes
-├── sidecar/                 Rust context builder + JSON-RPC server
-│   ├── src/                 completion, context, documents, index, rpc, syntax
-│   └── README.md            Sidecar-specific notes
-├── phoenix-backend/         Elixir gateway, auth, validation, FIM adapter
-│   └── README.md            Backend-specific notes
-├── integration-tests/       Node scripts (e2e, latency) driving the sidecar directly
-└── docs/                    Longer-form documentation
-```
-
-Per-component READMEs:
-- [vscode-extension/README.md](./vscode-extension/README.md)
-- [sidecar/README.md](./sidecar/README.md)
-- [phoenix-backend/README.md](./phoenix-backend/README.md)
-
-## The contract is frozen
-
-[protocol/README.md](./protocol/README.md) is **v1.0, frozen**. Don't edit it. Shape changes (fields, methods, semantics) go through the lead and require a version bump that every component adopts together.
+Every place a real implementation will go is marked with a `// placeholder:` (Rust/TS) or `@moduledoc placeholder:` (Elixir) comment explaining intent. Protocol and architecture docs describe the frozen/complete contract — the skeleton is a readable subset of it.

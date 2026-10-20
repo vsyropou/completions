@@ -11,21 +11,6 @@ if token = System.get_env("AUTH_TOKEN") do
   config :complete, :auth_token, token
 end
 
-# Phase 3: real upstream inference. Unset INFERENCE_BASE_URL → MockProvider.
-if base_url = System.get_env("INFERENCE_BASE_URL") do
-  config :complete, :inference,
-    base_url: base_url,
-    model: System.get_env("INFERENCE_MODEL", "Qwen/Qwen2.5-Coder-32B-Instruct"),
-    fim_template:
-      System.get_env(
-        "INFERENCE_FIM_TEMPLATE",
-        "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>"
-      ),
-    max_tokens: String.to_integer(System.get_env("INFERENCE_MAX_TOKENS", "512")),
-    temperature: String.to_float(System.get_env("INFERENCE_TEMPERATURE", "0.0")),
-    timeout_ms: String.to_integer(System.get_env("INFERENCE_TIMEOUT_MS", "25000"))
-end
-
 if config_env() == :prod do
   unless System.get_env("AUTH_TOKEN") do
     raise "environment variable AUTH_TOKEN is missing"

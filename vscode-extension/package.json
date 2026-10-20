@@ -3,11 +3,28 @@
   "displayName": "Completion",
   "description": "Low-latency multiline code completion",
   "version": "0.0.1",
-  "publisher": "local",
+  "publisher": "vasilis",
   "engines": { "vscode": "^1.85.0" },
   "activationEvents": [
     "onLanguage:typescript",
-    "onLanguage:typescriptreact"
+    "onLanguage:typescriptreact",
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:python",
+    "onLanguage:rust",
+    "onLanguage:go",
+    "onLanguage:java",
+    "onLanguage:c",
+    "onLanguage:cpp",
+    "onLanguage:csharp",
+    "onLanguage:elixir",
+    "onLanguage:json",
+    "onLanguage:yaml",
+    "onLanguage:dockerfile",
+    "onLanguage:makefile",
+    "onLanguage:html",
+    "onLanguage:css",
+    "onLanguage:markdown"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -38,14 +55,32 @@
           "type": "boolean",
           "default": false,
           "description": "Log per-request latency breakdown to the output channel"
+        },
+        "completion.modelUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL of the model server, e.g. http://localhost:8000. Empty = mock completions."
+        },
+        "completion.modelApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Bearer token for the model server. Empty = no auth header."
+        },
+        "completion.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model id, e.g. qwen2.5-coder-7b. Empty = 'default'."
+        },
+        "completion.fimTemplate": {
+          "type": "string",
+          "default": "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>",
+          "description": "FIM template with {prefix} and {suffix} placeholders."
         }
       }
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
-    "test:unit": "node --test test/*.test.js",
-    "test": "npm run compile && npm run test:unit"
+    "compile": "tsc -p ./"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

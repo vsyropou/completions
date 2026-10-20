@@ -11,10 +11,16 @@ use serde_json::json;
 /// Default FIM template when none configured.
 const DEFAULT_FIM_TEMPLATE: &str = "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>";
 
-/// ponytail: fixed for now — upstream defaults from the Elixir adapter.
-const MAX_TOKENS: u32 = 128;
-const TEMPERATURE: f32 = 0.2;
+/// ponytail: sensible defaults for inline ghost text — short + deterministic.
+/// Ghost text lives at cursor position; anything longer reads like codegen.
+const DEFAULT_MAX_TOKENS: u32 = 32;
+const DEFAULT_TEMPERATURE: f32 = 0.0;
 const TIMEOUT_MS: u64 = 25_000;
+
+/// Stop sequences: keep responses bounded to a reasonable code block. Without
+/// these, instruction-tuned models chat past the FIM midpoint (`This demonstrates
+/// ...`, markdown fences, restatements) and ghost text turns into narrative.
+const STOP_SEQUENCES: &[&str] = &["\n\n\n", "```", "<|fim_middle|>", "<|fim_suffix|>"];
 
 /// The one static string the learning mock returns.
 const MOCK_COMPLETION: &str = "// hello from mock backend\nfunction greet(name: string): string {\n  return `hello ${name}`;\n}\n";
@@ -60,19 +66,23 @@ pub async fn complete(
     repository_context: &str,
     request_id: &str,
 ) -> Result<CompleteResult, JsonRpcError> {
-    let (model_url, model_api_key, model, fim_template, http) = {
+    let (model_url, model_api_key, model, fim_template, temperature, max_tokens, http) = {
         let g = cfg.inner.lock().await;
         (
             g.model_url.clone(),
             g.model_api_key.clone(),
             g.model.clone(),
             g.fim_template.clone(),
+            g.temperature,
+            g.max_tokens,
             g.http.clone(),
         )
     };
 
     let model = model.unwrap_or_else(|| "default".into());
     let fim_template = fim_template.unwrap_or_else(|| DEFAULT_FIM_TEMPLATE.into());
+    let temperature = temperature.unwrap_or(DEFAULT_TEMPERATURE);
+    let max_tokens = max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
     let prompt = build_prompt(file_path, repository_context, &fim_template, prefix, suffix);
 
     let Some(base_url) = model_url else {
@@ -83,9 +93,9 @@ pub async fn complete(
     let body = json!({
         "model": model,
         "prompt": prompt,
-        "max_tokens": MAX_TOKENS,
-        "temperature": TEMPERATURE,
-        "stop": [],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stop": STOP_SEQUENCES,
     });
 
     let mut req = http

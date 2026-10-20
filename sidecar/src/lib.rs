@@ -39,6 +39,8 @@ pub struct Inner {
     pub model_api_key: Option<String>,
     pub model: Option<String>,
     pub fim_template: Option<String>,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<u32>,
 }
 
 impl Default for Config {
@@ -59,6 +61,8 @@ impl Default for Config {
                 model_api_key: None,
                 model: None,
                 fim_template: None,
+                temperature: None,
+                max_tokens: None,
             })),
         }
     }
@@ -87,6 +91,10 @@ impl Config {
 pub struct PendingState {
     pub cancel: HashMap<i64, tokio::task::AbortHandle>,
     pub answered: std::collections::HashSet<i64>,
+    /// Join handles for in-flight completion tasks. Shutdown awaits them
+    /// (best-effort, capped) so a `shutdown` frame doesn't silently swallow
+    /// a completion whose inference is nearly done.
+    pub tasks: Vec<tokio::task::JoinHandle<()>>,
 }
 
 pub struct Pending {
@@ -157,6 +165,22 @@ pub async fn run() {
                 write(&writer, resp).await;
             }
             ("shutdown", Some(id)) => {
+                // Drain in-flight completion tasks so a late `shutdown` doesn't
+                // silently eat a request the user is still waiting on. Bounded —
+                // give tasks up to 5 s to finish on their own.
+                let handles = {
+                    let mut st = pending.state.lock().await;
+                    std::mem::take(&mut st.tasks)
+                };
+                if !handles.is_empty() {
+                    tracing::info!(n = handles.len(), "shutdown: awaiting in-flight completions");
+                    let drain = async move {
+                        for h in handles {
+                            let _ = h.await;
+                        }
+                    };
+                    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), drain).await;
+                }
                 let resp = rpc::success_response(id, serde_json::Value::Null);
                 write(&writer, resp).await;
                 tracing::info!("shutdown");
@@ -205,6 +229,7 @@ pub async fn run() {
                         .cancel
                         .insert(n, task.abort_handle());
                 }
+                pending.state.lock().await.tasks.push(task);
             }
             ("completion/cancel", None) => {
                 if let Some(rid) = val
@@ -318,6 +343,14 @@ async fn handle_initialize(
         .get("fim_template")
         .and_then(|v| v.as_str())
         .map(str::to_owned);
+    let temperature = params
+        .get("temperature")
+        .and_then(|v| v.as_f64())
+        .map(|t| t as f32);
+    let max_tokens = params
+        .get("max_tokens")
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u32);
 
     {
         let mut g = cfg.inner.lock().await;
@@ -329,6 +362,8 @@ async fn handle_initialize(
         g.model_api_key = model_api_key;
         g.model = model;
         g.fim_template = fim_template;
+        g.temperature = temperature;
+        g.max_tokens = max_tokens;
     }
 
     // Spawn async workspace indexing — never block completions on it.

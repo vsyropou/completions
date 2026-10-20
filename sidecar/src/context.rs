@@ -243,16 +243,35 @@ pub fn enclosing_at(tree: &Tree, text: &str, byte_offset: usize) -> Enclosing {
     let mut class = None;
     while let Some(n) = node {
         match n.kind() {
+            // Function shapes across grammars. tree-sitter-python says
+            // "function_definition"; JS/TS say "function_declaration"/"arrow_function";
+            // Rust says "function_item"; Go says "function_declaration"; Java/C#
+            // method-bodies say "method_definition"/"method_declaration". We list
+            // them all — missing one means the encloser won't match a same-file
+            // symbol and it leaks into the repo-context block (regurgitation bait).
             "function_declaration"
+            | "function_definition"
+            | "function_item"
             | "function_expression"
             | "arrow_function"
             | "method_definition"
+            | "method_declaration"
             | "generator_function_declaration" => {
                 if function.is_none() {
                     function = name_of(&n, text);
                 }
             }
-            "class_declaration" => {
+            "class_declaration"
+            | "class_definition"      // python
+            | "interface_declaration" // ts / java / c#
+            | "struct_item"           // rust
+            | "enum_item"             // rust
+            | "trait_item"            // rust
+            | "enum_declaration"      // java / ts
+            | "struct_specifier"      // c / c++
+            | "class_specifier"       // c++
+            | "struct_declaration"    // c# -> struct
+            => {
                 if class.is_none() {
                     class = name_of(&n, text);
                 }
@@ -653,12 +672,24 @@ pub async fn build_repository_context_with_query(
 
     let mut lines: Vec<String> = Vec::new();
 
-    // (a) same-file symbols, minus enclosing function/class name
+    // (a) same-file symbols, minus enclosing function/class name AND any name
+    // already visible in the last few lines before the cursor (the file is
+    // right there in the prompt; repeating the symbol in "Related symbols" is
+    // regurgitation bait — the model learns to echo it).
     let in_file = index.symbols_for(&current_path).await;
+    let prefix_tail: String = {
+        // A few hundred bytes back from the cursor is enough — we're trying to
+        // catch freshly-typed `def helper():` / `fn helper(` / `function helper(`.
+        let tail_start = byte_offset.saturating_sub(400);
+        text[tail_start..byte_offset.min(text.len())].to_owned()
+    };
     for s in in_file.iter() {
         if enclosing.function.as_deref() == Some(s.name.as_str())
             || enclosing.class.as_deref() == Some(s.name.as_str())
         {
+            continue;
+        }
+        if prefix_tail.contains(s.name.as_str()) {
             continue;
         }
         lines.push(fmt_symbol(s, current_file));

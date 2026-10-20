@@ -28,7 +28,7 @@ All behind Bearer auth (`AUTH_TOKEN` env, default `dev-token`).
 - `GET  /api/v1/telemetry/completions` — `{"events": [ ... 50 newest ... ]}` newest-first, full bodies.
 - `GET  /api/v1/telemetry/stats` — `{"count": N, "avg_latency_ms": X, "by_language": {...}, "by_provider": {...}}`.
 
-Event body (written by `sidecar/src/telemetry.rs`):
+Event body (written by [`sidecar/src/telemetry.rs`](../sidecar/src/telemetry.rs)):
 ```json
 {
   "request_id":    "…",
@@ -53,7 +53,7 @@ mix test          # store+controller tests
 
 ## Storage
 
-`Complete.TelemetryStore` is an Elixir `Agent` supervised under `Complete.Application`. Holds max 500 events in-memory (list, prepend, drop-oldest). Restart loses data — that's intentional for a learning project. `# ponytail:` swap for SQLite or Postgres when the cap proves small.
+[`Complete.TelemetryStore`](./lib/complete/telemetry_store.ex) is an Elixir `Agent` supervised under [`Complete.Application`](./lib/complete/application.ex). Holds max 500 events in-memory (list, prepend, drop-oldest). Restart loses data — that's intentional for a learning project. `# ponytail:` swap for SQLite or Postgres when the cap proves small.
 
 ## Config
 

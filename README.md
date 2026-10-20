@@ -12,13 +12,13 @@ The Rust sidecar does the smart work — prompt assembly (FIM), repo context, cu
 
 Top-level layout:
 
-- `extension/` — VS Code extension in TypeScript
-- `sidecar/` — Rust per-window process
-- `telemetry/` — Phoenix backend (telemetry store + read endpoints)
-- `sidecar/tests/` — integration tests, mirrors `sidecar/src/`
-- `protocol/README.md` — frozen v1.1 contract for extension↔sidecar
-- `docs/architecture.md` — architecture map
-- `integration-tests/e2e.mjs` — smoke-test that drives the full pipeline
+- [`extension/`](./extension/) — VS Code extension in TypeScript
+- [`sidecar/`](./sidecar/) — Rust per-window process
+- [`telemetry/`](./telemetry/) — Phoenix backend (telemetry store + read endpoints)
+- [`sidecar/tests/`](./sidecar/tests/) — integration tests, mirrors [`sidecar/src/`](./sidecar/src/)
+- [`protocol/README.md`](./protocol/README.md) — frozen v1.2 contract for extension↔sidecar
+- [`docs/architecture.md`](./docs/architecture.md) — architecture map
+- [`integration-tests/e2e.mjs`](./integration-tests/e2e.mjs) — smoke-test that drives the full pipeline
 
 ## Install
 
@@ -46,11 +46,11 @@ node integration-tests/e2e.mjs
 
 ## Follow the completion's journey
 
-1. **You type.** VS Code fires `provideInlineCompletionItems` on our provider in `extension/src/extension.ts`. The extension forwards the doc state to the sidecar via `didOpen`/`didChange`/`didClose` and sends a `completion/request` over stdio JSON-RPC.
-2. **Framing.** LSP-style headers (`Content-Length: N\r\n\r\n` + JSON body) — see `extension/src/framing.ts` on the writer side and `sidecar/src/rpc.rs` on the reader side.
-3. **Dispatch.** `sidecar/src/lib.rs::run` reads frames, dispatches on `method` — `initialize`, document notifications, `completion/request`, `completion/cancel`, `shutdown`. Document state lives in `documents.rs`; syntax/OPL extraction in `syntax.rs` (tree-sitter, 14 languages) + `index.rs`; prompt-shape in `context.rs` (cursor-excerpt + repo BM25).
-4. **Inference.** `sidecar/src/inference.rs` builds the FIM prompt (template + repo context + prefix/suffix) and POSTs to `{model_url}/v1/completions` directly. Mock provider returns a static string when `model_url` is unset.
-5. **Telemetry.** After the inference returns, `sidecar/src/telemetry.rs` fires a detached POST to `{telemetry_url}/api/v1/telemetry/completions` with the full prompt+response+latency. Never blocks the editor.
+1. **You type.** VS Code fires `provideInlineCompletionItems` on our provider in [`extension/src/extension.ts`](./extension/src/extension.ts). The extension forwards the doc state to the sidecar via `didOpen`/`didChange`/`didClose` and sends a `completion/request` over stdio JSON-RPC.
+2. **Framing.** LSP-style headers (`Content-Length: N\r\n\r\n` + JSON body) — see [`extension/src/framing.ts`](./extension/src/framing.ts) on the writer side and [`sidecar/src/rpc.rs`](./sidecar/src/rpc.rs) on the reader side.
+3. **Dispatch.** [`sidecar/src/lib.rs::run`](./sidecar/src/lib.rs) reads frames, dispatches on `method` — `initialize`, document notifications, `completion/request`, `completion/cancel`, `shutdown`. Document state lives in [`documents.rs`](./sidecar/src/documents.rs); syntax/OPL extraction in [`syntax.rs`](./sidecar/src/syntax.rs) (tree-sitter, 14 languages) + [`index.rs`](./sidecar/src/index.rs); prompt-shape in [`context.rs`](./sidecar/src/context.rs) (cursor-excerpt + repo BM25).
+4. **Inference.** [`sidecar/src/inference.rs`](./sidecar/src/inference.rs) builds the FIM prompt (template + repo context + prefix/suffix) and POSTs to `{model_url}/v1/completions` directly. Mock provider returns a static string when `model_url` is unset.
+5. **Telemetry.** After the inference returns, [`sidecar/src/telemetry.rs`](./sidecar/src/telemetry.rs) fires a detached POST to `{telemetry_url}/api/v1/telemetry/completions` with the full prompt+response+latency. Never blocks the editor.
 6. **Back.** The sidecar maps the inference result into a JSON-RPC response `{text, document_version}` → extension wraps it as a `vscode.InlineCompletionItem` → VS Code renders ghost text.
 
 ## Phoenix telemetry read API
@@ -63,6 +63,6 @@ Events are stored in-memory, capped at 500, newest-first. Phoenix restart wipes 
 
 ## Learn more
 
-- Each component has its own README (`extension/README.md`, `sidecar/README.md`, `telemetry/README.md`).
-- Full contract: `protocol/README.md` (frozen v1.1).
-- Architecture map with file-level diagram: `docs/architecture.md`.
+- Each component has its own README: [`extension/README.md`](./extension/README.md), [`sidecar/README.md`](./sidecar/README.md), [`telemetry/README.md`](./telemetry/README.md).
+- Full contract: [`protocol/README.md`](./protocol/README.md) (frozen v1.2).
+- Architecture map with file-level diagram: [`docs/architecture.md`](./docs/architecture.md).

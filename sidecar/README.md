@@ -1,6 +1,6 @@
 # sidecar
 
-Per-window Rust process that does the smart work of the completion pipeline. Spawned by the VS Code extension (`extension/`) over stdio, talks to the inference server directly, posts fire-and-forget telemetry to Phoenix (`telemetry/`).
+Per-window Rust process that does the smart work of the completion pipeline. Spawned by the VS Code extension in [`../extension/`](../extension/) over stdio, talks to the inference server directly, posts fire-and-forget telemetry to Phoenix in [`../telemetry/`](../telemetry/).
 
 ## What it does
 
@@ -32,7 +32,7 @@ tests/           # mirrors src/ — 68 integration tests
   {completion,context,dispatch,documents,index,inference,rpc,syntax,telemetry}.rs
 ```
 
-Tests live exclusively under `tests/` (integration tests use the crate's `pub` surface only). No `#[cfg(test)]` in `src/` — keep it that way.
+Tests live exclusively under [`tests/`](./tests/) (integration tests use the crate's `pub` surface only). No `#[cfg(test)]` in [`src/`](./src/) — keep it that way.
 
 ## Build and run
 
@@ -44,7 +44,25 @@ cargo test --test inference         # one file
 cargo test --test inference test_name
 ```
 
-Run standalone — the binary sits silently on stdin. Drive it from `integration-tests/e2e.mjs` for a full request/response session.
+Run standalone — the binary sits silently on stdin. Drive it from [`integration-tests/e2e.mjs`](../integration-tests/e2e.mjs) for a full request/response session.
+
+### Run it by hand (no editor)
+
+The sidecar speaks LSP-style framing (a `Content-Length` header, blank line, JSON body) over stdin/stdout. You can drive it from a shell via `printf` (heredocs sneak in trailing newlines that break the frame parser):
+
+```sh
+{ printf 'Content-Length: 160\r\n\r\n'
+  printf '%s' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspace_root":"file:///tmp","telemetry_url":"http://localhost:4000","telemetry_api_key":"dev-token"}}'
+  printf 'Content-Length: 149\r\n\r\n'
+  printf '%s' '{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"uri":"file:///tmp/demo.py","language":"python","version":1,"text":"def helper():\n    "}}'
+  printf 'Content-Length: 159\r\n\r\n'
+  printf '%s' '{"jsonrpc":"2.0","id":2,"method":"completion/request","params":{"document_uri":"file:///tmp/demo.py","document_version":1,"position":{"line":1,"character":4}}}'
+  printf 'Content-Length: 44\r\n\r\n'
+  printf '%s' '{"jsonrpc":"2.0","id":3,"method":"shutdown"}'
+} | ./target/debug/sidecar
+```
+
+Each `Content-Length` value is the byte length of the JSON body that follows. Compute one with `python3 -c 'import json; s=json.dumps(msg, separators=(",",":")); print(len(s))'` (compact separators — extra whitespace counts as body bytes). The sidecar emits the responses framed the same way; logs go to stderr (via `tracing` in [`src/main.rs`](./src/main.rs)), protocol bytes to stdout. The sibling [`integration-tests/e2e.mjs`](../integration-tests/e2e.mjs) does this plumbing for you — it's the easier path.
 
 ## Config (from `initialize` JSON-RPC call)
 
@@ -63,6 +81,6 @@ Anything else in `initialize.params` is ignored (forward-compat).
 
 ## Docs
 
-- Dispatch / shared state: `lib.rs` header docs.
-- JSON-RPC wire shape: `../../protocol/README.md` (frozen v1.2).
-- Tree-sitter per-language node names: `index.rs::extract`.
+- Dispatch / shared state: [`src/lib.rs`](./src/lib.rs) header docs.
+- JSON-RPC wire shape: [`../protocol/README.md`](../protocol/README.md) (frozen v1.2).
+- Tree-sitter per-language node names: [`index.rs::extract`](./src/index.rs).

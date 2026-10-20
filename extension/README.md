@@ -1,17 +1,19 @@
 # extension
 
-VS Code extension in TypeScript. Thin adapter: spawns the Rust `sidecar` process, forwards document events, and renders inline completions. All real work (prompt building, inference, telemetry) happens in the sidecar.
+VS Code extension in TypeScript. Thin adapter: spawns the Rust [`sidecar`](../sidecar/) process, forwards document events, and renders inline completions. All real work (prompt building, inference, telemetry) happens in the sidecar.
 
 ## Layout
 
 ```
-package.json       # activationEvents: ['*'], settings contributions
+package.json       # activationEvents explicit list, settings contributions
 tsconfig.json      # compiled output to out/
 src/
   extension.ts     # activation, child-process spawn, JSON-RPC client, document sync
   framing.ts       # Content-Length header encode/decode (LSP-style)
 out/               # tsc output (not committed)
 ```
+
+(Every file listed lives in this directory — see [`package.json`](./package.json), [`tsconfig.json`](./tsconfig.json), [`src/extension.ts`](./src/extension.ts), [`src/framing.ts`](./src/framing.ts).)
 
 ## Build and run
 
@@ -46,9 +48,9 @@ All four `model*`/`fimTemplate` settings plus `telemetryUrl`/`telemetryApiKey`/`
 
 ## Activation
 
-The extension registers an explicit per-language activation list — see [`package.json`](./package.json) (`activationEvents`). It currently covers 19 languages (`typescript`, `typescriptreact`, `javascript`, `javascriptreact`, `python`, `rust`, `go`, `java`, `c`, `cpp`, `csharp`, `elixir`, `json`, `yaml`, `dockerfile`, `makefile`, `html`, `css`, `markdown`). Adding a new grammar to `sidecar/src/syntax.rs` means a matching `onLanguage:` entry in that list.
+The extension registers an explicit per-language activation list — see [`package.json`](./package.json) (`activationEvents`). It currently covers 19 languages (`typescript`, `typescriptreact`, `javascript`, `javascriptreact`, `python`, `rust`, `go`, `java`, `c`, `cpp`, `csharp`, `elixir`, `json`, `yaml`, `dockerfile`, `makefile`, `html`, `css`, `markdown`). Adding a new grammar to [`sidecar/src/syntax.rs`](../sidecar/src/syntax.rs) means a matching `onLanguage:` entry in that list.
 
 ## Docs
 
-- Wire protocol: `../protocol/README.md` (frozen v1.1).
-- Overall architecture: `../docs/architecture.md`.
+- Wire protocol: [`../protocol/README.md`](../protocol/README.md) (frozen v1.2).
+- Overall architecture: [`../docs/architecture.md`](../docs/architecture.md).

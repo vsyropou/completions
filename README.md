@@ -47,31 +47,29 @@ make clean          # drop staged artifacts
 
 ## Host a local model with llama.cpp
 
-The sidecar talks to any OpenAI-compatible server on `{model_url}/v1/completions`. The fastest zero-GPU way to bring one up is `llama.cpp`.
+The sidecar talks to any OpenAI-compatible server on `{model_url}/v1/completions`. The fastest zero-GPU way to bring one up is [`llama.cpp`](https://github.com/ggml-org/llama.cpp) — install it however you like, then use the bundled Makefile targets to run `llama-server`.
 
-**1. Install `llama.cpp`** (macOS and Linux via brew):
+**1. Install `llama.cpp`.** Follow [their install docs](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md) — `brew install llama.cpp`, build from source, or grab a pre-built binary. You need `llama-server` on your `$PATH`.
 
-```sh
-brew install llama.cpp
-```
-
-Or build from source (see [`llama.cpp` README](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md)):
-
-```sh
-git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp
-cmake -B build && cmake --build build --config Release
-```
-
-**2. Run the bundled Makefile targets.** Defaults host `Qwen2.5-Coder-1.5B-Instruct-GGUF` (bartowski repack, Q4_K_M quantization, ~1 GB download on first pull) on `127.0.0.1:8000`:
+**2. Pull + run with the Makefile.** Defaults host [`bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF`](https://huggingface.co/bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF) (Q4_K_M quantization, ~1 GB download on first pull) on `127.0.0.1:8000`:
 
 ```sh
 make model-pull          # warm the HF cache; downloads once to ~/.cache/huggingface
 make model               # start llama-server on port 8000 (Ctrl+C to stop)
-make model-stop          # kill the running server
+make model-stop          # kill a backgrounded server
 make model-logs          # confirm what's listening
 ```
 
-**3. Point VS Code at it.** In user settings, set:
+**3. Ping the server** to make sure it's alive and answering prompts:
+
+```sh
+curl http://127.0.0.1:8000/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen2.5-coder-1.5b-instruct","prompt":"def fib(n):","max_tokens":32,"temperature":0}'
+# → {"choices":[{"text":"...","finish_reason":"length"}], ...}
+```
+
+**4. Point VS Code at it.** In user settings:
 
 ```json
 "completion.modelUrl": "http://127.0.0.1:8000",
@@ -80,7 +78,7 @@ make model-logs          # confirm what's listening
 
 `modelApiKey` can stay empty — `llama-server` accepts any bearer (or none). Reload the dev-host window.
 
-**4. Watch the telemetry pick it up.** With Phoenix running (`cd telemetry && mix phx.server`), `curl http://localhost:4000/api/v1/stats` should flip events' `"provider"` from `"mock"` → `"model"`.
+**5. Watch telemetry pick it up.** With Phoenix running (`cd telemetry && mix phx.server`), `curl http://localhost:4000/api/v1/stats` should flip events' `"provider"` from `"mock"` → `"model"`.
 
 **Swap the model.** Override the Makefile variables for a different repo/quantization/port:
 

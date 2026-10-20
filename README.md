@@ -1,58 +1,68 @@
-# code-completion — learning skeleton
+# code-completion-light
 
-A three-process code-completion pipeline you can read end-to-end. Skeleton state: plumbing is real, intelligence is placeholder. Typing in VS Code triggers a request that flows Extension → Rust sidecar → Phoenix → static mock response → ghost text in the editor.
+Low-latency multiline code completion in VS Code. Three processes, split roles:
 
 ```
-VS Code extension (TS) ──JSON-RPC 2.0/stdio──▶ Rust sidecar ──HTTP/JSON──▶ Phoenix (Elixir) ──▶ static mock
+VS Code extension (TS) ──JSON-RPC 2.0/stdio──▶ Rust sidecar ──▶ Inference server
+                                                       │
+                                                       └──▶ Phoenix (telemetry sink, optional)
 ```
 
-Full contract (the "real" system you'll grow toward): [protocol/README.md](./protocol/README.md), [docs/architecture.md](./docs/architecture.md).
+The Rust sidecar does the smart work — prompt assembly (FIM), repo context, cursor excerpt, BM25 ranking, and the HTTP call to the inference server. Phoenix is no longer in the response path; it receives fire-and-forget telemetry events and exposes them via a small read API.
+
+Top-level layout:
+
+- `extension/` — VS Code extension in TypeScript
+- `sidecar/` — Rust per-window process
+- `telemetry/` — Phoenix backend (telemetry store + read endpoints)
+- `sidecar/tests/` — integration tests, mirrors `sidecar/src/`
+- `protocol/README.md` — frozen v1.1 contract for extension↔sidecar
+- `docs/architecture.md` — architecture map
+- `integration-tests/e2e.mjs` — smoke-test that drives the full pipeline
 
 ## Install
 
-Three sibling dirs, each with its own toolchain. Elixir/Erlang versions pinned in `phoenix-backend/.tool-versions` (erlang 28.2, elixir 1.18.4-otp-28) — install via asdf/mise first.
+Each component has its own toolchain. Elixir/Erlang pinned via `telemetry/.tool-versions` (erlang 28.2, elixir 1.18.4-otp-28) — install via asdf/mise first.
 
 ```sh
-cd phoenix-backend && mix setup                          # deps.get
-cd ../sidecar && cargo build                             # debug binary
-cd ../vscode-extension && npm install && npm run compile # compile TS
-```
-
-Gotcha — if `cargo` fails with "Bad CPU type in executable": `/usr/local/bin/cargo` is stale. Use rustup's instead:
-```sh
-export PATH="$HOME/.cargo/bin:$PATH"
+cd telemetry && mix setup                                       # deps.get
+cd ../sidecar && cargo build                                    # debug binary at target/debug/sidecar
+export PATH="$HOME/.cargo/bin:$PATH"                            # /usr/local/bin/cargo on this machine is broken
+cd ../extension && npm install && npm run compile               # tsc → out/
 ```
 
 ## Run
 
 Three terminals, plus a VS Code dev-host window:
 
-1. **Phoenix** — `cd phoenix-backend && mix phx.server` (port 4000, code-reloader on).
-2. **Sidecar** — nothing to start by hand; the VS Code extension spawns one per window.
-3. **Extension** — open `vscode-extension/` in VS Code, press **F5** to launch an Extension Development Host. In its settings set `completion.sidecarPath` to the absolute path of `sidecar/target/debug/sidecar`. In the dev-host, open a `.ts` file and type — you should see a static ghost-text suggestion appear.
-4. **Headless smoke check** — with Phoenix running and the sidecar built:
-   ```sh
-   node integration-tests/e2e.mjs
-   ```
-   Drives the sidecar over stdio without an editor and asserts the mock response round-trips.
+1. **Telemetry** — `cd telemetry && mix phx.server` (port 4000). Optional — the sidecar skips telemetry when Phoenix is down, so completions work either way.
+2. **Inference** — point at your model server (vLLM, Ollama, etc) via VS Code settings, or leave `completion.modelUrl` empty to fall back to the mock string.
+3. **Extension** — open `extension/` in VS Code, press F5 → Extension Development Host. In the dev-host, set `completion.sidecarPath` to `…/sidecar/target/debug/sidecar`. Open a `.ts`, `.py`, or any other `.rs`-supported file and type — ghost text appears.
+
+**Headless smoke test** (with Phoenix up):
+```sh
+node integration-tests/e2e.mjs
+```
 
 ## Follow the completion's journey
 
-The mock returns one fixed string: `// hello from mock backend` followed by a small `greet` function. Grep that string to find every hop:
+1. **You type.** VS Code fires `provideInlineCompletionItems` on our provider in `extension/src/extension.ts`. The extension forwards the doc state to the sidecar via `didOpen`/`didChange`/`didClose` and sends a `completion/request` over stdio JSON-RPC.
+2. **Framing.** LSP-style headers (`Content-Length: N\r\n\r\n` + JSON body) — see `extension/src/framing.ts` on the writer side and `sidecar/src/rpc.rs` on the reader side.
+3. **Dispatch.** `sidecar/src/lib.rs::run` reads frames, dispatches on `method` — `initialize`, document notifications, `completion/request`, `completion/cancel`, `shutdown`. Document state lives in `documents.rs`; syntax/OPL extraction in `syntax.rs` (tree-sitter, 14 languages) + `index.rs`; prompt-shape in `context.rs` (cursor-excerpt + repo BM25).
+4. **Inference.** `sidecar/src/inference.rs` builds the FIM prompt (template + repo context + prefix/suffix) and POSTs to `{model_url}/v1/completions` directly. Mock provider returns a static string when `model_url` is unset.
+5. **Telemetry.** After the inference returns, `sidecar/src/telemetry.rs` fires a detached POST to `{phoenix_url}/api/v1/telemetry/completions` with the full prompt+response+latency. Never blocks the editor.
+6. **Back.** The sidecar maps the inference result into a JSON-RPC response `{text, document_version}` → extension wraps it as a `vscode.InlineCompletionItem` → VS Code renders ghost text.
 
-1. **You type a `.ts` snippet.** VS Code fires `provideInlineCompletionItems` on our provider → `vscode-extension/src/extension.ts`. The extension forwards the document body to the sidecar via `didOpen` / `didChange` notifications, then sends a `completion/request`.
-2. **Framing.** The request isn't a plain string — it's `Content-Length: N\r\n\r\n` + a JSON-RPC 2.0 envelope over stdin/stdout. See `vscode-extension/src/framing.ts` on the writer side and `sidecar/src/rpc.rs` on the reader side.
-3. **Dispatch.** `sidecar/src/main.rs` → `lib.rs::run` reads frames, dispatches on `method` — `initialize`, `didOpen`/`didChange`/`didClose` (document store in `documents.rs`), `completion/request` (entry into `completion.rs`), `completion/cancel`, `shutdown`. Everything the dispatch does on top of that is `// placeholder:` — this is where tree-sitter parsing, repo indexing, prompt building, and version checks will live.
-4. **HTTP hop.** `completion.rs` builds the body (`prefix`, `suffix`, `repository_context`, `max_tokens`, `request_id`) and posts to `http://localhost:4000/api/v1/completions` with `Authorization: Bearer dev-token`. Auth must match Phoenix's `AUTH_TOKEN` env.
-5. **Phoenix.** `lib/complete_web/router.ex` → `CompletionController.create/2` (auth plug → validation → `CompletionGateway.generate/1` → `MockProvider.generate/1`). `MockProvider` returns the static string. Watch the Phoenix console — you'll see the request logged.
-6. **Back the same way.** Phoenix responds `{request_id, completion, finish_reason, model}` → sidecar parses, maps to JSON-RPC result `{text, document_version}` → extension inserts the `text` as a `vscode.InlineCompletionItem` and VS Code renders it as ghost text.
+## Phoenix telemetry read API
 
-Things to look at while learning:
-- `vscode-extension/src/extension.ts` — single file, the whole VS Code side.
-- `sidecar/src/rpc.rs` — how to read `Content-Length`-framed JSON-RPC off stdin in Rust.
-- `sidecar/src/lib.rs` — the dispatch loop that ties rpc/documents/completion together.
-- `phoenix-backend/lib/complete_web/controllers/completion_controller.ex` — clean Elixir `with`-chain for validation.
+- `GET /api/v1/telemetry/completions` — 50 newest events (Bearer auth)
+- `GET /api/v1/telemetry/completions/{id}` — (not implemented; use the list endpoint)
+- `GET /api/v1/telemetry/stats` — `{count, avg_latency_ms, by_language, by_provider}`
 
-## Where the placeholders live
+Events are stored in-memory, capped at 500, newest-first. Phoenix restart wipes them.
 
-Every place a real implementation will go is marked with a `// placeholder:` (Rust/TS) or `@moduledoc placeholder:` (Elixir) comment explaining intent. Protocol and architecture docs describe the frozen/complete contract — the skeleton is a readable subset of it.
+## Learn more
+
+- Each component has its own README (`extension/README.md`, `sidecar/README.md`, `telemetry/README.md`).
+- Full contract: `protocol/README.md` (frozen v1.1).
+- Architecture map with file-level diagram: `docs/architecture.md`.

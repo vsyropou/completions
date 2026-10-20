@@ -1,32 +1,33 @@
 # Architecture
 
-Three processes, two hops, one contract. The frozen wire shapes live in [protocol/README.md](../protocol/README.md) — this page is the map, that file is the law.
+Three processes, two hops, one frozen contract. The frozen wire shapes live in [protocol/README.md](../protocol/README.md) — this page is the map, that file is the law.
 
 ```
-┌──────────────────────────────┐         ┌──────────────────────────┐         ┌───────────────────────────┐
-│  VS Code extension (TS)      │         │  Rust sidecar            │         │  Phoenix backend (Elixir) │
-│                              │         │                          │         │                           │
-│  vscode-extension/src/       │         │  sidecar/src/            │         │  phoenix-backend/lib/     │
-│                              │         │                          │         │                           │
-│  ┌────────────────────────┐  │ stdin/  │  ┌────────────────────┐  │  HTTP   │  ┌───────────────────────┐│
-│  │ extension.ts           │  │ stdout  │  │ rpc.rs    (JSON-   │  │  JSON   │  │ CompletionController  ││
-│  │  • spawn sidecar       │─▶│headers  │─▶│           RPC)     │─▶│ +Bearer │─▶│   create/2            ││
-│  │  • inline completion   │  │ +frame  │  │ documents.rs       │  │         │  └─────────┬───────────┘│
-│  │    provider            │◀─│         │◀─│ context.rs (prompt)│◀─│         │            │            │
-│  │  • document sync       │  │         │  │ index.rs  (repo)   │  │         │            ▼            │
-│  └────────────────────────┘  │         │  │ syntax.rs (ts)     │  │         │  ┌───────────────────────┐│
-│                              │         │  └────────────────────┘  │         │  │ CompletionGateway     ││
-│  Output channel:             │         │                          │         │  │  • MockProvider       ││
-│   "Completion Sidecar"       │         │  stderr → logs           │         │  │  • FimAdapter (Finch) ││
-└──────────────────────────────┘         └──────────────────────────┘         │  └─────────┬───────────┘│
-                                                                              └────────────┼───────────┘
-                                                                                           │ HTTP
-                                                                                           ▼
-                                                                              ┌─────────────────────────┐
-                                                                              │ Inference server        │
-                                                                              │ vLLM / SGLang (OpenAI-  │
-                                                                              │ compatible) :8000       │
-                                                                              └─────────────────────────┘
+┌──────────────────────────────┐         ┌──────────────────────────┐         ┌────────────────────────┐
+│  VS Code extension (TS)      │         │  Rust sidecar            │         │  Phoenix (Elixir)      │
+│                              │         │                          │         │  (telemetry sink)      │
+│  extension/src/              │         │  sidecar/src/            │         │  telemetry/lib/        │
+│                              │         │                          │         │                        │
+│  ┌────────────────────────┐  │ stdin/  │  ┌────────────────────┐  │         │  ┌──────────────────┐  │
+│  │ extension.ts           │  │ stdout  │  │ rpc.rs    (JSON-   │  │         │  │ TelemetryStore   │  │
+│  │  • spawn sidecar       │─▶│headers  │─▶│           RPC)     │─│────────▶│  │  (Agent, 500-cap │  │
+│  │  • inline completion   │  │ +frame  │  │ documents.rs       │  │ teletele│  │   in-memory)     │  │
+│  │    provider            │◀─│         │◀─│ context.rs (excerpt│◀│ │ POST   │  └──────────────────┘  │
+│  │  • document sync       │  │         │  │ index.rs  (BM25)   │  │ async   │          │             │
+│  └────────────────────────┘  │         │  │ syntax.rs (ts)     │  │         │          │ read API    │
+│                              │         │  │ inference.rs (FIM) │  │         │          ▼             │
+│  Output channel:             │         │  │ telemetry.rs       │  │         │  GET telemetry/*       │
+│   "Completion Sidecar"       │         │  └────────────────────┘  │         └────────────────────────┘
+└──────────────────────────────┘         └────────────┬─────────────┘
+                                                      │
+                                                      │ HTTP
+                                                      ▼
+                                          ┌─────────────────────────┐
+                                          │ Inference server        │
+                                          │ vLLM / Ollama / etc     │
+                                          │ POST {model_url}/       │
+                                          │   v1/completions        │
+                                          └─────────────────────────┘
 ```
 
 ## Hop 1 — Extension ↔ Sidecar (JSON-RPC 2.0 over stdio)
@@ -35,44 +36,53 @@ LSP-style framing: `Content-Length: N\r\n\r\n<json>`. stdout is protocol-only; l
 
 Requests (response expected):
 
-- `initialize` — handshake; sends `workspace_root`, `phoenix_url`, `auth_token`, `max_tokens`, `measure_latency`. Returns `capabilities`.
-- `completion/request` — ask for a completion. Params: `document_uri`, `document_version`, `position {line, character}` (UTF-16, zero-based), `max_tokens`. Returns `{text, document_version}` or a JSON-RPC error (`-32000` unknown document, `-32001` stale version, `-32002` upstream error, `-32003` cancelled).
+- `initialize` — handshake; sends `workspace_root`, `phoenix_url`, `auth_token`, `max_tokens`, `measure_latency`, plus inference config `model_url` / `model_api_key` / `model` / `fim_template`. Returns `capabilities`.
+- `completion/request` — ask for a completion. Params: `document_uri`, `document_version`, `position {line, character}` (UTF-16, zero-based). Returns `{text, document_version}` or a JSON-RPC error (`-32000` unknown document, `-32001` stale version, `-32002` upstream error, `-32003` cancelled).
 - `shutdown` — graceful exit; sidecar responds then exits 0.
 
 Notifications (no response):
 
 - `textDocument/didOpen` — file opened: `uri`, `language`, `version`, full `text`.
-- `textDocument/didChange` — full-document replacement: `uri`, `version`, full `text`.
+- `textDocument/didChange` — full-document replacement: `uri`, `version`, full `text`. Version must be `current + 1` or it is rejected silently.
 - `textDocument/didClose` — evict: `uri`.
 - `completion/cancel` — best-effort cancel: `request_id` equals the JSON-RPC `id` of the `completion/request` to drop.
 
-## Hop 2 — Sidecar ↔ Phoenix (HTTP/JSON)
+## Hop 2 — Sidecar ↔ Inference (HTTP/JSON)
 
-Single endpoint:
+The sidecar calls the inference server directly — no Phoenix on this path.
 
 ```
-POST /api/v1/completions
+POST {model_url}/v1/completions
 Content-Type: application/json
-Authorization: Bearer <token>
+Authorization: Bearer {model_api_key}      # only when configured
 ```
 
-Body: `{request_id, language, file_path, prefix, suffix, repository_context, max_tokens}`. The sidecar splits the document at the UTF-16 cursor position, converts to UTF-8 byte offsets, fills `prefix` / `suffix`, and generates `request_id` (UUID v4).
+Body: `{model, prompt, max_tokens: 128, temperature: 0.2, stop: []}`. The sidecar builds `prompt` per `fim_template` (defaults to the Starcoder chain `<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>`), prefixed with `# Path: <file_path>` plus an optional `# Related symbols:` block from `index.rs` + `context.rs`.
 
-Response (200): `{request_id, completion, finish_reason, model}`. Errors are uniform JSON `{error: {code, message}}` with status ∈ 400 / 401 / 413 / 422 / 502 / 504.
+Response (200): OpenAI-compatible `{"choices":[{"text":…, "finish_reason":…}]}`. Errors map to JSON-RPC `-32002`.
 
-## Hop 3 — Phoenix ↔ Inference
+When `model_url` is empty, the sidecar's mock path returns a static determin string (the `// hello from mock backend` marker).
 
-`Complete.CompletionGateway` dispatches:
+## Hop 3 — Sidecar ↔ Phoenix (telemetry, asynchronous)
 
-- `INFERENCE_BASE_URL` unset → `MockProvider` (deterministic string, no HTTP hop).
-- Set → `FimAdapter` (Finch HTTP client) sends the FIM-templated request to the inference server and parses the response.
+Fire-and-forget, never blocks the editor:
+
+```
+POST {phoenix_url}/api/v1/telemetry/completions
+Content-Type: application/json
+Authorization: Bearer {auth_token}
+```
+
+Body: `{request_id, language, file_path, prompt, response, latency_ms, provider, model, finish_reason}`. Phoenix stores to an in-memory Agent (500-event cap) and replies `202` — the sidecar does not await.
 
 ## Ground rules
 
 - Positions are UTF-16, zero-based, everywhere on the wire. Only the sidecar converts to UTF-8 bytes for slicing.
-- `document_version` is monotonically increasing per document. The extension discards any completion whose `document_version` doesn't match the editor's current version; the sidecar also rejects stale requests with `-32001`.
-- Body limit on the HTTP hop is **256 KB**, enforced by Phoenix (`413 too_large`).
-- Single shared bearer token (`AUTH_TOKEN` env on Phoenix; `completion.authToken` in VS Code). No user DB in v1.
-- Cancellation is best-effort at every hop; the extension always ignores late responses.
+- `document_version` is monotonically increasing per document. `didChange` must send `current + 1` or the update is dropped (`warn` only — it's a notification).
+- Stale versions on `completion/request` → `-32001` with `data.current_version`. Extension discards responses whose `document_version` doesn't match the current editor state.
+- Cancellation: `-32003`, claimed atomically via one Mutex over pending+answered state — no double-send.
+- Debounce: 200 ms per URI, latest-wins. Superseded requests return `-32003`.
+- Frame cap: malformed Content-Length headers terminate the sidecar; 256 KB per-frame cap enforced on both sides.
+- Bearer auth for both HTTP hops (`auth_token` for telemetry, `model_api_key` for inference).
 
-Full field-by-field contract, error table, and timeout budgets: [protocol/README.md](../protocol/README.md) (frozen v1.0 — changes go through the lead with a version bump).
+Full field-by-field contract, error table, and timeouts: [protocol/README.md](../protocol/README.md) (frozen v1.1).

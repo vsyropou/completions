@@ -17756,3 +17756,1174 @@ Type: :worker
 10:08:07.197 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 845ms
 
 10:08:07.199 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 847ms
+
+10:18:36.899 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:18:36.898 instance_id=1A157F785EB [info] Resolved entity: {:module, CompleteWeb.Plugs.Auth}
+
+10:18:36.901 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 26ms
+
+10:18:36.902 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:18:36.901 instance_id=1A157F785EB [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+10:18:36.904 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 28ms
+
+10:18:36.907 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 27ms
+
+10:18:37.170 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 296ms
+
+10:18:37.173 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 292ms
+
+10:19:16.341 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 25ms
+
+10:19:16.341 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:16.341 instance_id=1A157F785EB [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+10:19:16.342 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:16.342 instance_id=1A157F785EB [info] Resolved entity: {:module, CompleteWeb.Plugs.Auth}
+
+10:19:16.342 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 27ms
+
+10:19:16.344 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 27ms
+
+10:19:16.559 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 242ms
+
+10:19:16.561 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 244ms
+
+10:19:56.251 instance_id=1A157F785EB [debug] handled notification client -> server workspace/didChangeWatchedFiles in 15ms
+
+10:19:56.260 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didClose in 8ms
+
+10:19:56.261 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:56.261 instance_id=1A157F785EB [info] Opened file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/lib/complete_web/plugs/auth.ex
+
+10:19:56.261 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didOpen in 1ms
+
+10:19:56.261 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didClose in 85µs
+
+10:19:56.261 instance_id=1A157F785EB [info] Child {XPExpert.EngineSupervisor, "telemetry::102239938"} of Supervisor :"telemetry::102239938::supervisor" started
+Pid: #PID<0.315.0>
+Start Call: XPExpert.EngineSupervisor.start_link(%XPForge.Project{root_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry", mix_exs_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: nil, entropy: 61308})
+Restart: :permanent
+Shutdown: 5000
+Type: :worker
+
+10:19:56.261 instance_id=1A157F785EB [debug] sent request server -> client window/workDoneProgress/create
+
+10:19:56.262 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:56.262 instance_id=1A157F785EB [info] Opened file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/lib/complete_web/router.ex
+
+10:19:56.262 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didOpen in 733µs
+
+10:19:56.272 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:56.272 instance_id=1A157F785EB [debug] sent request server -> client window/workDoneProgress/create
+
+10:19:56.284 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:56.657 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:56.657 instance_id=1A157F785EB [info] Using path: /opt/homebrew/Cellar/expert/0.1.11/libexec/expert/erts-17.1/bin:/opt/homebrew/Cellar/expert/0.1.11/libexec/expert/bin:/Users/vsyropou/.antigravity/antigravity/bin:/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Applications/Cursor.app/Contents/Resources/app/bin:/Applications/Visual Studio Code.app/Contents/Resources/app/bin:/Library/Frameworks/Python.framework/Versions/3.10/bin:/Library/Frameworks/Python.framework/Versions/3.11/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/Privileges.app/Contents/MacOS:/Library/TeX/texbin:/opt/homebrew/bin:/Users/vsyropou/.asdf/shims:/Users/vsyropou/.antigravity/antigravity/bin:/opt/homebrew/opt/postgresql@17/bin:/Users/vsyropou/.local/bin:/opt/homebrew/sbin:/Applications/Cursor.app/Contents/Resources/app/bin:/Applications/Visual Studio Code.app/Contents/Resources/app/bin:/Library/Frameworks/Python.framework/Versions/3.10/bin:/Library/Frameworks/Python.framework/Versions/3.11/bin:/Users/vsyropou/.cargo/bin:/Users/vsyropou/.orbstack/bin:/Users/vsyropou/.lmstudio/bin:/Users/vsyropou/.orbstack/bin:/Users/vsyropou/.lmstudio/bin
+
+10:19:56.657 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:56.657 instance_id=1A157F785EB [info] Found elixir executable at /Users/vsyropou/.asdf/shims/elixir
+
+10:19:56.657 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:56.657 instance_id=1A157F785EB [info] Found erl executable at /Users/vsyropou/.asdf/shims/erl
+
+10:19:56.657 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:56.657 instance_id=1A157F785EB [info] Preparing engine
+
+10:19:56.753 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:56.753 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:56.753 instance_id=1A157F785EB [info] Received request textDocument/codeAction before engine for telemetry was initialized. Ignoring.
+
+10:19:56.753 instance_id=1A157F785EB [info] Received request textDocument/codeAction before engine for telemetry was initialized. Ignoring.
+
+10:19:56.753 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 664µs
+
+10:19:56.753 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 398µs
+
+10:19:57.785 instance_id=1A157F785EB [debug] Engine build output: Namespacing 4 files:
+
+10:19:57.785 instance_id=1A157F785EB [debug] Engine build output: New: 4
+
+10:19:57.785 instance_id=1A157F785EB [debug] Engine build output: Changed: 0
+
+10:19:57.785 instance_id=1A157F785EB [debug] Engine build output: Deleted: 4
+
+10:19:57.785 instance_id=1A157F785EB [debug] Engine build output: 
+
+10:19:57.791 instance_id=1A157F785EB [debug] Engine build output: Rewriting 0 app files
+
+10:19:57.792 instance_id=1A157F785EB [debug] Engine build output: Rewriting .beam files
+
+10:19:57.792 instance_id=1A157F785EB [debug] Engine build output: Found 0 protocols
+
+10:19:57.792 instance_id=1A157F785EB [debug] Engine build output: Found 0 app beam files
+
+10:19:57.792 instance_id=1A157F785EB [debug] Engine build output: Finished namespacing .beam files
+
+10:19:57.793 instance_id=1A157F785EB [debug] Engine build output: Rewriting 0 scripts
+
+10:19:57.795 instance_id=1A157F785EB [debug] Engine build output: Rebuilding 0 boot files
+
+10:19:57.796 instance_id=1A157F785EB [debug] Engine build output: Rewriting 0 config scripts.
+
+10:19:57.800 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:57.800 instance_id=1A157F785EB [info] Engine available at: /Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns
+
+10:19:57.823 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:57.823 instance_id=1A157F785EB [info] ebin paths:
+["/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_briefly/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_elixir_sense/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_engine/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_forge/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_gen_lsp/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_jason/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_logger_backends/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_nimble_options/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_nimble_parsec/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_path_glob/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_schematic/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_sourceror/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_spitfire/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_telemetry/ebin",
+ "/Users/vsyropou/Library/Caches/expert/0.1.11/elixir-1.18.4-erts-16.1.2/248de23024cc62456be9aef8d06afcb7/_build/dev_ns/lib/xp_typed_struct/ebin"]
+
+10:19:57.839 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:57.839 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:57.954 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:57.954 instance_id=1A157F785EB [warning] Received unexpected message {:EXIT, #PID<0.324.0>, :normal}
+
+10:19:58.384 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.386 instance_id=1A157F785EB [debug] Node port message: ok
+
+
+10:19:58.480 instance_id=1A157F785EB [debug] Node port message: 
+10:19:58.475 [notice] Application mix exited: :stopped
+
+
+10:19:58.494 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.494 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.498 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.675 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.675 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.675 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.675 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.675 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.675 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.675 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.676 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.676 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.676 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.676 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.676 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.676 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:58.676 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:59.032 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:19:59.032 instance_id=1A157F785EB [info] Child {XPExpert.Project.Node, "telemetry::102239938"} of Supervisor :"telemetry::102239938::supervisor" started
+Pid: #PID<0.316.0>
+Start Call: XPExpert.Project.Node.start_link(%XPForge.Project{root_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry", mix_exs_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: nil, entropy: 61308})
+Restart: :permanent
+Shutdown: 5000
+Type: :worker
+
+10:19:59.032 instance_id=1A157F785EB [info] Child {XPExpert.Project.Diagnostics, "telemetry::102239938"} of Supervisor :"telemetry::102239938::supervisor" started
+Pid: #PID<0.345.0>
+Start Call: XPExpert.Project.Diagnostics.start_link(%XPForge.Project{root_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry", mix_exs_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: nil, entropy: 61308})
+Restart: :permanent
+Shutdown: 5000
+Type: :worker
+
+10:19:59.033 instance_id=1A157F785EB [info] Child {XPExpert.Project.Intelligence, "telemetry::102239938"} of Supervisor :"telemetry::102239938::supervisor" started
+Pid: #PID<0.346.0>
+Start Call: XPExpert.Project.Intelligence.start_link(%XPForge.Project{root_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry", mix_exs_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: nil, entropy: 61308})
+Restart: :permanent
+Shutdown: 5000
+Type: :worker
+
+10:19:59.033 instance_id=1A157F785EB [info] Child XPExpert.Project.SearchListener of Supervisor :"telemetry::102239938::supervisor" started
+Pid: #PID<0.347.0>
+Start Call: XPExpert.Project.SearchListener.start_link(%XPForge.Project{root_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry", mix_exs_uri: "file:///Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: nil, entropy: 61308})
+Restart: :permanent
+Shutdown: 5000
+Type: :worker
+
+10:19:59.034 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:19:59.034 instance_id=1A157F785EB [info] Started project node for telemetry
+
+10:20:00.037 instance_id=1A157F785EB [debug] Node port message: 
+10:20:00.037 [info] Building telemetry
+
+
+10:20:00.038 instance_id=1A157F785EB [debug] sent request server -> client window/workDoneProgress/create
+
+10:20:00.038 instance_id=1A157F785EB [debug] Node port message: 
+10:20:00.038 [debug] sent request server -> client window/workDoneProgress/create
+
+
+10:20:00.038 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:00.039 instance_id=1A157F785EB [debug] Node port message: 
+10:20:00.038 [debug] sent notification server -> client $/progress
+
+
+10:20:00.117 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:00.117 instance_id=1A157F785EB [debug] Node port message: 
+10:20:00.117 [debug] sent notification server -> client $/progress
+
+
+10:20:00.132 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:00.132 instance_id=1A157F785EB [debug] Node port message: 
+10:20:00.132 [debug] sent notification server -> client $/progress
+
+
+10:20:00.140 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:00.141 instance_id=1A157F785EB [debug] Node port message: 
+10:20:00.140 [debug] sent notification server -> client $/progress
+
+
+10:20:00.931 instance_id=1A157F785EB [debug] Node port message: Resolving Hex dependencies...
+
+
+10:20:00.993 instance_id=1A157F785EB [debug] Node port message: Resolution completed in 0.059s
+
+
+10:20:00.997 instance_id=1A157F785EB [debug] Node port message: Unchanged:
+
+
+10:20:00.997 instance_id=1A157F785EB [debug] Node port message:   bandit 1.12.5 VULNERABLE!
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:     EEF-CVE-2026-105659 (HIGH)
+    aka: CVE-2026-105659, GHSA-69m6-wcv4-rwcf
+    HTTP/2 blocked-send deadlines reset on every WINDOW_UPDATE, letting a trickle pin stream processes indefinitely in Bandit
+    https://osv.dev/vulnerability/EEF-CVE-2026-105659
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message: 
+    EEF-CVE-2026-105660 (MEDIUM)
+    aka: CVE-2026-105660, GHSA-v53v-9hvg-37jf
+    Unvalidated HTTP/1 request-target authority lets a client choose conn.host and conn.port in Bandit
+    https://osv.dev/vulnerability/EEF-CVE-2026-105660
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   bypass 2.1.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   cowboy 2.20.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   cowboy_telemetry 0.4.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   cowlib 2.21.0 VULNERABLE!
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:     EEF-CVE-2026-43966 (MEDIUM)
+    aka: CVE-2026-43966, GHSA-w4f7-4cxr-rv3c
+    HTTP Response Splitting via Non-VCHAR Bytes in cow_http_struct_hd:escape_string/2
+    https://osv.dev/vulnerability/EEF-CVE-2026-43966
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   finch 0.24.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   hpax 1.1.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   jason 1.4.5
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   mime 2.0.7
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   mint 1.11.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   nimble_options 1.1.1
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   nimble_pool 1.1.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   phoenix 1.8.15
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   phoenix_pubsub 2.4.1
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   phoenix_template 1.1.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   plug 1.20.3
+  plug_cowboy 2.9.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   plug_crypto 2.2.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   ranch 1.8.1
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   telemetry 1.4.2
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   thousand_island 1.5.0
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   websock 0.5.3
+
+
+10:20:00.999 instance_id=1A157F785EB [debug] Node port message:   websock_adapter 0.6.0
+
+
+10:20:01.028 instance_id=1A157F785EB [debug] Node port message: Found packages with security advisories, see above for details
+
+
+10:20:01.030 instance_id=1A157F785EB [debug] Node port message: All dependencies are up to date
+
+
+10:20:01.031 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.031 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.031 [debug] sent notification server -> client $/progress
+
+
+10:20:01.032 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.032 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.032 [debug] sent notification server -> client $/progress
+
+
+10:20:01.034 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.034 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.033 [info] Loaded []
+
+
+10:20:01.034 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.034 [debug] sent notification server -> client $/progress
+
+
+10:20:01.174 instance_id=1A157F785EB [debug] Node port message: Compiling 10 files (.ex)
+
+
+10:20:01.188 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.188 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.188 [debug] sent notification server -> client $/progress
+
+
+10:20:01.191 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.191 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.191 [debug] sent notification server -> client $/progress
+
+
+10:20:01.192 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.192 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.192 [debug] sent notification server -> client $/progress
+
+
+10:20:01.198 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.198 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.198 [debug] sent notification server -> client $/progress
+
+
+10:20:01.201 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.201 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.201 [debug] sent notification server -> client $/progress
+
+
+10:20:01.208 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.208 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.208 [debug] sent notification server -> client $/progress
+
+
+10:20:01.209 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.209 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.209 [debug] sent notification server -> client $/progress
+
+
+10:20:01.228 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.229 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.228 [debug] sent notification server -> client $/progress
+
+
+10:20:01.237 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.237 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.237 [debug] sent notification server -> client $/progress
+
+
+10:20:01.260 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.260 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.260 [debug] sent notification server -> client $/progress
+
+
+10:20:01.288 instance_id=1A157F785EB [debug] Node port message: Generated complete app
+
+
+10:20:01.290 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.290 [info] Compile completed with status ok Produced 0 diagnostics []
+
+
+10:20:01.290 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.291 instance_id=1A157F785EB [debug] sent request server -> client window/workDoneProgress/create
+
+10:20:01.291 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.290 [debug] sent notification server -> client $/progress
+
+
+10:20:01.291 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.291 [info] Plugins found 0 results in 0.005 ms
+
+
+10:20:01.291 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.291 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.291 [debug] sent request server -> client window/workDoneProgress/create
+
+
+10:20:01.291 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.291 [debug] sent notification server -> client $/progress
+
+
+10:20:01.292 instance_id=1A157F785EB [debug] sent request server -> client window/workDoneProgress/create
+
+10:20:01.292 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.292 [debug] sent request server -> client window/workDoneProgress/create
+
+
+10:20:01.292 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.292 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.292 [debug] sent notification server -> client $/progress
+
+
+10:20:01.293 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
+
+10:20:01.293 instance_id=1A157F785EB [info] Compiled telemetry in 1.3 seconds
+
+10:20:01.297 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.297 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.297 [debug] sent notification server -> client $/progress
+
+
+10:20:01.385 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:01.385 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.385 [debug] sent notification server -> client $/progress
+
+
+10:20:01.386 instance_id=1A157F785EB [debug] Node port message: 
+10:20:01.386 [notice] disk_log: repairing ~c"/Users/vsyropou/Documents/prs/repos/code-completion-light/telemetry/.expert/indexes/ets/28.2/1.18.4/4/updates.wal" ...
+
+
+
+10:20:03.357 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.357 [info] backend reports stale
+
+
+10:20:03.609 instance_id=1A157F785EB [debug] sent request server -> client window/workDoneProgress/create
+
+10:20:03.609 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.609 [debug] sent request server -> client window/workDoneProgress/create
+
+
+10:20:03.610 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.610 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.610 [debug] sent notification server -> client $/progress
+
+
+10:20:03.611 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.612 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.612 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.611 [debug] sent notification server -> client $/progress
+
+
+10:20:03.612 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.612 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.612 [debug] sent notification server -> client $/progress
+
+
+10:20:03.612 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.612 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.612 [debug] sent notification server -> client $/progress
+
+
+10:20:03.612 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.612 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.612 [debug] sent notification server -> client $/progress
+
+
+10:20:03.612 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.612 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.612 [debug] sent notification server -> client $/progress
+
+
+10:20:03.612 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.612 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.612 [debug] sent notification server -> client $/progress
+
+
+10:20:03.613 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.613 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.612 [debug] sent notification server -> client $/progress
+
+
+10:20:03.613 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.613 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.613 [debug] sent notification server -> client $/progress
+
+
+10:20:03.613 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.613 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.613 [debug] sent notification server -> client $/progress
+
+
+10:20:03.613 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.613 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.613 [debug] sent notification server -> client $/progress
+
+
+10:20:03.613 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.613 [debug] sent notification server -> client $/progress
+
+
+10:20:03.667 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.666 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.686 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.687 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.686 [debug] sent notification server -> client $/progress
+
+
+10:20:03.703 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.703 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.703 [debug] sent notification server -> client $/progress
+
+
+10:20:03.718 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.719 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.718 [debug] sent notification server -> client $/progress
+
+
+10:20:03.726 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.726 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.727 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.726 [debug] sent notification server -> client $/progress
+
+
+10:20:03.727 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.726 [debug] sent notification server -> client $/progress
+
+
+10:20:03.732 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.733 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.734 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.732 [debug] sent notification server -> client $/progress
+
+
+10:20:03.734 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.733 [debug] sent notification server -> client $/progress
+
+
+10:20:03.736 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.736 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.736 [debug] sent notification server -> client $/progress
+
+
+10:20:03.749 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.750 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.750 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.749 [debug] sent notification server -> client $/progress
+
+
+10:20:03.750 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.750 [debug] sent notification server -> client $/progress
+
+
+10:20:03.776 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.778 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.776 [debug] sent notification server -> client $/progress
+
+
+10:20:03.808 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.809 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.808 [debug] sent notification server -> client $/progress
+
+
+10:20:03.812 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.813 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.812 [debug] sent notification server -> client $/progress
+
+
+10:20:03.829 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.830 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.829 [debug] sent notification server -> client $/progress
+
+
+10:20:03.832 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.832 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.832 [debug] sent notification server -> client $/progress
+
+
+10:20:03.833 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.833 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.833 [debug] sent notification server -> client $/progress
+
+
+10:20:03.836 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.836 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.836 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.836 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.837 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.836 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.837 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.836 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.837 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.837 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.837 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.837 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.837 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.837 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.838 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.837 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.838 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.837 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.838 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.837 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.838 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.838 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.844 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.844 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.844 [debug] sent notification server -> client $/progress
+
+
+10:20:03.851 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.851 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.851 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.851 [debug] sent notification server -> client $/progress
+
+
+10:20:03.852 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.851 [debug] sent notification server -> client $/progress
+
+
+10:20:03.859 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.859 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.859 [debug] sent notification server -> client $/progress
+
+
+10:20:03.878 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.879 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.878 [debug] sent notification server -> client $/progress
+
+
+10:20:03.890 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.891 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.890 [debug] sent notification server -> client $/progress
+
+
+10:20:03.907 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.907 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.907 [debug] sent notification server -> client $/progress
+
+
+10:20:03.926 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.925 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:03.925 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:03.925 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.926 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.925 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.926 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.925 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.926 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.926 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.926 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.926 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.926 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.926 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.926 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.926 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.927 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.926 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.927 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.926 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.929 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.930 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.929 [debug] sent notification server -> client $/progress
+
+
+10:20:03.931 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.931 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.931 [debug] sent notification server -> client $/progress
+
+
+10:20:03.936 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.936 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:03.938 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.938 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.939 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.938 [debug] sent notification server -> client $/progress
+
+
+10:20:03.940 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.938 [debug] sent notification server -> client $/progress
+
+
+10:20:03.949 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.949 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.949 [debug] sent notification server -> client $/progress
+
+
+10:20:03.965 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.965 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.965 [debug] sent notification server -> client $/progress
+
+
+10:20:03.980 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.981 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.980 [debug] sent notification server -> client $/progress
+
+
+10:20:03.996 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.997 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.997 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.996 [debug] sent notification server -> client $/progress
+
+
+10:20:03.997 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:03.997 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.997 [debug] sent notification server -> client $/progress
+
+
+10:20:03.998 instance_id=1A157F785EB [debug] Node port message: 
+10:20:03.997 [debug] sent notification server -> client $/progress
+
+
+10:20:04.009 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.009 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.009 [debug] sent notification server -> client $/progress
+
+
+10:20:04.017 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.017 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.018 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.018 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.018 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.018 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.018 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.018 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.019 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.019 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.019 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.019 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.019 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.019 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.019 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.019 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.019 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.019 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.020 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.019 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.020 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.020 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.029 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.029 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.029 [debug] sent notification server -> client $/progress
+
+
+10:20:04.035 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.035 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.035 [debug] sent notification server -> client $/progress
+
+
+10:20:04.060 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.061 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.060 [debug] sent notification server -> client $/progress
+
+
+10:20:04.065 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.065 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.065 [debug] sent notification server -> client $/progress
+
+
+10:20:04.067 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.068 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.067 [debug] sent notification server -> client $/progress
+
+
+10:20:04.087 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.088 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.087 [debug] sent notification server -> client $/progress
+
+
+10:20:04.089 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.089 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.089 [debug] sent notification server -> client $/progress
+
+
+10:20:04.101 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.102 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.101 [debug] sent notification server -> client $/progress
+
+
+10:20:04.105 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.107 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.105 [debug] sent notification server -> client $/progress
+
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.107 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.107 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.107 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.107 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.124 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.123 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.132 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.132 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.132 [debug] sent notification server -> client $/progress
+
+
+10:20:04.140 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.141 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.140 [debug] sent notification server -> client $/progress
+
+
+10:20:04.147 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.148 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.147 [debug] sent notification server -> client $/progress
+
+
+10:20:04.194 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.194 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.194 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.194 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.194 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.194 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.194 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.194 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.195 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.195 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:04.195 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.195 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.195 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.195 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.195 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.195 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.195 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.197 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.197 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.197 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.197 [debug] sent notification server -> client $/progress
+
+
+10:20:04.197 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.197 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.197 [debug] sent notification server -> client $/progress
+
+
+10:20:04.197 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.197 [debug] sent notification server -> client $/progress
+
+
+10:20:04.206 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.205 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.206 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.206 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.206 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.206 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.206 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.206 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.207 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.207 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.207 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.206 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.207 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.207 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.207 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.207 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.207 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.207 [warning] nothing to expand (expand_alias was passed nil)
+
+
+10:20:04.277 instance_id=1A157F785EB [debug] sent notification server -> client $/progress
+
+10:20:04.277 instance_id=1A157F785EB [debug] Node port message: 
+10:20:04.277 [debug] sent notification server -> client $/progress
+

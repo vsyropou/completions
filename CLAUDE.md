@@ -14,9 +14,9 @@ VS Code extension (TS) ──JSON-RPC 2.0/stdio──▶ Rust sidecar ──▶ 
 
 The Rust sidecar is the smart one: it does prompt assembly (FIM templating), calls the inference server directly, and post-facto notifies Phoenix with a fire-and-forget telemetry event. Phoenix is no longer an inference proxy — it's a 500-event in-memory ring buffer with three read endpoints.
 
-- `vscode-extension/` — activation on `*` (any language), spawns sidecar per window, JSON-RPC client over stdio.
+- `extension/` — activation on `*` (any language), spawns sidecar per window, JSON-RPC client over stdio.
 - `sidecar/` — per-window process. `main.rs`/`rpc.rs`/`lib.rs` (dispatch loop) real; `documents`/`syntax`/`index`/`context` real (tree-sitter parses 14 languages, BM25 over repo files, cursor-excerpt expansion); `inference.rs` (FimAdapter ported from Elixir) real; `telemetry.rs` detached POST to Phoenix.
-- `phoenix-backend/` — Phoenix is a telemetry sink. `TelemetryStore` (Agent, 500-event cap) + `POST /api/v1/telemetry/completions`, `GET /api/v1/telemetry/completions`, `GET /api/v1/telemetry/stats`. Old `CompletionGateway` / `MockProvider` deleted.
+- `telemetry/` — Phoenix telemetry sink. `TelemetryStore` (Agent, 500-event cap) + `POST /api/v1/telemetry/completions`, `GET /api/v1/telemetry/completions`, `GET /api/v1/telemetry/stats`. Old `CompletionGateway` / `MockProvider` deleted.
 - `protocol/README.md` — **frozen v1.1 wire contract** for the extension↔sidecar hop. Phoenix-side HTTP contract is internal; not in the frozen spec.
 
 ## Hard rules in the contract
@@ -32,7 +32,7 @@ The Rust sidecar is the smart one: it does prompt assembly (FIM templating), cal
 
 Three sibling components, no top-level build. Run from each dir.
 
-**Phoenix** (`phoenix-backend/`, Elixir pinned via `.tool-versions`: erlang 28.2, elixir 1.18.4-otp-28):
+**Telemetry** (`telemetry/`, Elixir pinned via `.tool-versions`: erlang 28.2, elixir 1.18.4-otp-28):
 ```sh
 mix setup
 mix phx.server        # :4000, code_reloader on
@@ -49,17 +49,17 @@ cargo test --test inference test_name  # one test
 ```
 Debug binary at `sidecar/target/debug/sidecar`; it sits silently on stdin when run alone.
 
-**Extension** (`vscode-extension/`):
+**Extension** (`extension/`):
 ```sh
 npm install
 npm run compile                        # tsc → out/
 ```
-Manual loop: F5 in `vscode-extension/` window → dev-host. Set `completion.sidecarPath` in the **dev-host's** settings to the sidecar debug binary.
+Manual loop: F5 in `extension/` window → dev-host. Set `completion.sidecarPath` in the **dev-host's** settings to the sidecar debug binary.
 
-**End-to-end smoke test** (needs Phoenix on :4000 + sidecar built):
+**End-to-end smoke test** (needs sidecar built; Phoenix optional):
 ```sh
 node integration-tests/e2e.mjs         # asserts static mock round-trips through full chain
-# bypasses Phoenix entirely if Phoenix is down — telemetry is non-blocking
+# telemetry is non-blocking — Phoenix may be down
 ```
 
 ## Configuration flow (4 settings that matter now)
@@ -108,6 +108,6 @@ tests/{completion,context,documents,dispatch,index,rpc,syntax,inference,telemetr
 
 - Extension: "Completion Sidecar" output channel.
 - Sidecar: `tracing` to stderr (visible in extension's output channel).
-- Phoenix: endpoint logs to terminal where `mix phx.server` runs.
+- Telemetry server: endpoint logs to terminal where `mix phx.server` runs.
 - Trace a request: mock string is the greppable marker `// hello from mock backend`. Real-inference requests show up in Phoenix's telemetry ring buffer immediately.
 - If sidecar won't start, check the machine's cargo (broken Homebrew binary at `/usr/local/bin/cargo` — use `~/.cargo/bin/cargo`).

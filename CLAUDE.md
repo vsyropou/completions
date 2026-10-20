@@ -14,7 +14,7 @@ VS Code extension (TS) ──JSON-RPC 2.0/stdio──▶ Rust sidecar ──▶ 
 
 The Rust sidecar is the smart one: it does prompt assembly (FIM templating), calls the inference server directly, and post-facto notifies Phoenix with a fire-and-forget telemetry event. Phoenix is no longer an inference proxy — it's a 500-event in-memory ring buffer with three read endpoints.
 
-- `extension/` — activation on `*` (any language), spawns sidecar per window, JSON-RPC client over stdio.
+- `extension/` — explicit `onLanguage:*` activation list (19 languages), spawns sidecar per window, JSON-RPC client over stdio.
 - `sidecar/` — per-window process. `main.rs`/`rpc.rs`/`lib.rs` (dispatch loop) real; `documents`/`syntax`/`index`/`context` real (tree-sitter parses 14 languages, BM25 over repo files, cursor-excerpt expansion); `inference.rs` (FimAdapter ported from Elixir) real; `telemetry.rs` detached POST to Phoenix.
 - `telemetry/` — Phoenix telemetry sink. `TelemetryStore` (Agent, 500-event cap) + `POST /api/v1/telemetry/completions`, `GET /api/v1/telemetry/completions`, `GET /api/v1/telemetry/stats`. Old `CompletionGateway` / `MockProvider` deleted.
 - `protocol/README.md` — **frozen v1.1 wire contract** for the extension↔sidecar hop. Phoenix-side HTTP contract is internal; not in the frozen spec.
@@ -81,7 +81,7 @@ To try a real model, set `modelUrl` + `model` (+ `modelApiKey` if your server ne
 
 ## Multi-language support
 
-`Lang` in `syntax.rs` covers 14 grammar-backed languages (TS/TSX/JS/JSX/Python/Rust/Go/Java/C/Cpp/CSharp/Elixir/Json/Yaml) + `NoParser` fallback. `activationEvents: ["*"]` in package.json. Grammar crates add deps to `sidecar/Cargo.toml` — pulling in another language means a new `Lang` variant, grammar dep, extractor in `index.rs::extract`, and (if the language has them) an import resolver in `context.rs::resolve_import`.
+`Lang` in `syntax.rs` covers 14 grammar-backed languages (TS/TSX/JS/JSX/Python/Rust/Go/Java/C/Cpp/CSharp/Elixir/Json/Yaml) + `NoParser` fallback. `activationEvents` is the explicit 19-language list — **keep it in sync with the Lang enum when adding a language** (new Lang variant, grammar dep, extractor in `index.rs::extract`, import resolver in `context.rs::resolve_import`, plus matching `onLanguage:` entry in `extension/package.json`).
 
 ## Test layout (recently relocated — don't re-inline)
 

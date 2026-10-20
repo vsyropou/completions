@@ -9,27 +9,35 @@ HF_FILE  ?= Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf
 MODEL_PORT ?= 8000
 LLAMA_CACHE ?= $(HOME)/.cache/huggingface
 
-.PHONY: compile package install uninstall clean model model-pull model-stop model-logs
-
+.PHONY: compile
 compile:
 	cd extension && npm run compile
 	cargo build --release --manifest-path sidecar/Cargo.toml
 	mkdir -p extension/bin
 	cp sidecar/target/release/sidecar extension/bin/
 
+.PHONY: compile-telemetry
+compile-telemetry:
+	cd telemetry && mix deps.get && mix compile
+
+.PHONY: package
 package: compile
 	cd extension && npx @vscode/vsce package
 
+.PHONY: install
 install: package
 	code --install-extension $(VSIX)
 
+.PHONY: uninstall
 uninstall:
 	code --uninstall-extension vasilis.completion
 
+.PHONY: clean
 clean:
 	rm -f extension/completion-*.vsix
 	rm -f extension/bin/sidecar
 
+.PHONY: model
 model:
 	@command -v llama-server >/dev/null || { echo "llama-server not found. brew install llama.cpp"; exit 1; }
 	@echo "Starting llama-server on port $(MODEL_PORT), repo=$(HF_REPO), file=$(HF_FILE)"
@@ -40,6 +48,7 @@ model:
 		--port "$(MODEL_PORT)" \
 		--host 127.0.0.1
 
+.PHONY: model-pull
 # Download the model file without starting the server (first-time warm-up).
 model-pull:
 	@command -v llama-cli >/dev/null || { echo "llama-cli not found. brew install llama.cpp"; exit 1; }
@@ -50,8 +59,10 @@ model-pull:
 		--n-predict 1 \
 		--no-warmup 2>&1 | tail -5
 
+.PHONY: model-stop
 model-stop:
 	-pkill -f "llama-server.*--port $(MODEL_PORT)"
 
+.PHONY: model-logs
 model-logs:
 	@lsof -i :$(MODEL_PORT) -sTCP:LISTEN -n -P 2>/dev/null | tail -n +2 | awk '{print $$1, $$2}' || echo "no llama-server on port $(MODEL_PORT)"

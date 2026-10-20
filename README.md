@@ -18,6 +18,7 @@ Top-level layout:
 - [`sidecar/tests/`](./sidecar/tests/) — integration tests, mirrors [`sidecar/src/`](./sidecar/src/)
 - [`protocol/README.md`](./protocol/README.md) — frozen v1.2 contract for extension↔sidecar
 - [`docs/architecture.md`](./docs/architecture.md) — architecture map
+- [`docs/sidecar-flow.md`](./docs/sidecar-flow.md) — dispatch + request-pipeline flowcharts
 - [`integration-tests/e2e.mjs`](./integration-tests/e2e.mjs) — smoke-test that drives the full pipeline
 
 ## Install
@@ -65,8 +66,7 @@ make model-logs          # confirm what's listening
 ```sh
 curl http://127.0.0.1:8000/v1/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"qwen2.5-coder-1.5b-instruct","prompt":"def fib(n):","max_tokens":32,"temperature":0}'
-# → {"choices":[{"text":"...","finish_reason":"length"}], ...}
+  -d '{"model":"qwen2.5-coder-1.5b-instruct","prompt":"def fib(n):","max_tokens":32,"temperature":0}' | jq '.'
 ```
 
 **4. Point VS Code at it.** In user settings:
@@ -126,3 +126,4 @@ Events are stored in-memory, capped at 500, newest-first. Phoenix restart wipes 
 - Each component has its own README: [`extension/README.md`](./extension/README.md), [`sidecar/README.md`](./sidecar/README.md), [`telemetry/README.md`](./telemetry/README.md).
 - Full contract: [`protocol/README.md`](./protocol/README.md) (frozen v1.2).
 - Architecture map with file-level diagram: [`docs/architecture.md`](./docs/architecture.md).
+- Sidecar dispatch + request pipeline flowcharts: [`docs/sidecar-flow.md`](./docs/sidecar-flow.md).

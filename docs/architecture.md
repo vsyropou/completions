@@ -36,7 +36,7 @@ LSP-style framing: `Content-Length: N\r\n\r\n<json>`. stdout is protocol-only; l
 
 Requests (response expected):
 
-- `initialize` — handshake; sends `workspace_root`, `telemetry_url`, `telemetry_api_key`, `measure_latency`, plus inference config `model_url` / `model_api_key` / `model` / `fim_template`. Returns `capabilities`.
+- `initialize` — handshake; sends `workspace_root`, `telemetry_url`, `telemetry_api_key`, `measure_latency`, plus inference config `model_url` / `model_api_key` / `model` / `fim_template` / `temperature` / `max_tokens`. Returns `capabilities`.
 - `completion/request` — ask for a completion. Params: `document_uri`, `document_version`, `position {line, character}` (UTF-16, zero-based). Returns `{text, document_version}` or a JSON-RPC error (`-32000` unknown document, `-32001` stale version, `-32002` upstream error, `-32003` cancelled).
 - `shutdown` — graceful exit; sidecar responds then exits 0.
 
@@ -57,7 +57,7 @@ Content-Type: application/json
 Authorization: Bearer {model_api_key}      # only when configured
 ```
 
-Body: `{model, prompt, max_tokens: 128, temperature: 0.2, stop: []}`. The sidecar builds `prompt` per `fim_template` (defaults to the Starcoder chain `<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>`), prefixed with `# Path: <file_path>` plus an optional `# Related symbols:` block from [`index.rs`](../sidecar/src/index.rs) + [`context.rs`](../sidecar/src/context.rs).
+Body: `{model, prompt, max_tokens: <cfg>, temperature: <cfg>, stop: ["\n\n\n", "```", "<|fim_middle|>", "<|fim_suffix|>"]}`. The sidecar builds `prompt` per `fim_template` (defaults to the Starcoder chain `<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>`), prefixed with `# Path: <file_path>` plus an optional `# Related symbols:` block from [`index.rs`](../sidecar/src/index.rs) + [`context.rs`](../sidecar/src/context.rs). `temperature` defaults to `0.0` and `max_tokens` to `32` (VS Code settings `completion.temperature` / `completion.maxTokens`) — inline ghost text wants short, deterministic answers.
 
 Response (200): OpenAI-compatible `{"choices":[{"text":…, "finish_reason":…}]}`. Errors map to JSON-RPC `-32002`.
 

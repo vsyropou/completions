@@ -2,11 +2,14 @@
 
 Contract version: **v1.2** (frozen 2026-10-20). No field renames, endpoint changes, or coordinate changes without lead approval and a version bump.
 
+Wire format follows the [JSON-RPC 2.0 specification](https://www.jsonrpc.org/specification), with [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#headerPart) style framing (`Content-Length: N\r\n\r\n` + UTF-8 JSON body).
+
 ## Changes in v1.2
 
 - `initialize.params.phoenix_url` renamed to `telemetry_url` (the hop is telemetry-only now — Phoenix is not in the inference path).
 - `initialize.params.auth_token` renamed to `telemetry_api_key` (it's used for the telemetry sink only).
-- `initialize.params.max_tokens` **removed**. The sidecar's inference path uses a hard-coded constant (`max_tokens=128`); the Config field was unused.
+- `initialize.params.max_tokens` **transiently removed, then re-added** in the same contract version: the sidecar first used a hard-coded constant, then made it user-configurable (default `32`).
+- `initialize.params.temperature` **added** — user-configurable sampling (default `0.0`).
 - `initialize.params.measure_latency` **still accepted**; the sidecar uses it to gate `[latency] …` log lines.
 
 ## Changes in v1.1
@@ -44,6 +47,8 @@ Content-Length: 87\r\n
 {"jsonrpc":"2.0","id":1,"method":"initialize",...}
 ```
 
+**Cap:** each frame's decoded body is limited to **256 KB** on both sides; the sidecar's parser exits fatally on oversize or malformed headers ([`rpc.rs::read_message`](../sidecar/src/rpc.rs)), the extension's decoder matches ([`framing.ts`](../extension/src/framing.ts)).
+
 ### 2.2 Methods
 
 Requests (need a response): `initialize`, `completion/request`, `shutdown`.
@@ -64,7 +69,9 @@ Notifications (no response): `textDocument/didOpen`, `textDocument/didChange`, `
     "model_url": "",
     "model_api_key": "",
     "model": "",
-    "fim_template": "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>"
+    "fim_template": "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>",
+    "temperature": 0.0,
+    "max_tokens": 32
   }
 }
 ```
@@ -191,7 +198,7 @@ The `request_id` equals the JSON-RPC `id` of the `completion/request` to cancel.
 { "jsonrpc": "2.0", "id": 999, "method": "shutdown" }
 ```
 
-Response: `{ "jsonrpc": "2.0", "id": 999, "result": null }`. Rust exits with code 0 after responding. The extension then closes stdio and terminates the process if it does not exit within 2s.
+Response: `{ "jsonrpc": "2.0", "id": 999, "result": null }`. Rust awaits in-flight `completion/request` tasks (best-effort, 5 s cap) before responding, so a `shutdown` that races a completion doesn't silently drop it. Then exits with code 0. The extension then closes stdio and terminates the process if it does not exit within 2s.
 
 ---
 

@@ -8,6 +8,7 @@ HF_REPO  ?= bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF
 HF_FILE  ?= Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf
 MODEL_PORT ?= 8000
 LLAMA_CACHE ?= $(HOME)/.cache/huggingface
+MODEL_LOG ?= /tmp/llama-server-$(MODEL_PORT).log
 
 .PHONY: compile
 compile:
@@ -42,11 +43,12 @@ model:
 	@command -v llama-server >/dev/null || { echo "llama-server not found. brew install llama.cpp"; exit 1; }
 	@echo "Starting llama-server on port $(MODEL_PORT), repo=$(HF_REPO), file=$(HF_FILE)"
 	@echo "Cache: $(LLAMA_CACHE)  (set LLAMA_CACHE env var to change)"
+	@echo "Logs: $(MODEL_LOG)  (tail -f, or 'make model-logs')"
 	LLAMA_CACHE="$(LLAMA_CACHE)" llama-server \
 		--hf-repo "$(HF_REPO)" \
 		--hf-file "$(HF_FILE)" \
 		--port "$(MODEL_PORT)" \
-		--host 127.0.0.1
+		--host 127.0.0.1 2>&1 | tee "$(MODEL_LOG)"
 
 .PHONY: model-pull
 # Download the model file without starting the server (first-time warm-up).
@@ -65,4 +67,8 @@ model-stop:
 
 .PHONY: model-logs
 model-logs:
+	@tail -f "$(MODEL_LOG)"
+
+.PHONY: model-listeners
+model-listeners:
 	@lsof -i :$(MODEL_PORT) -sTCP:LISTEN -n -P 2>/dev/null | tail -n +2 | awk '{print $$1, $$2}' || echo "no llama-server on port $(MODEL_PORT)"

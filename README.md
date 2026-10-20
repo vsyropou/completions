@@ -45,6 +45,53 @@ make clean          # drop staged artifacts
 
 `make install` is the equivalent of "ship it" for a single-machine setup; `make package` alone gives you a `.vsix` you can hand to someone else's VS Code (`Extensions: Install from VSIX…`).
 
+## Host a local model with llama.cpp
+
+The sidecar talks to any OpenAI-compatible server on `{model_url}/v1/completions`. The fastest zero-GPU way to bring one up is `llama.cpp`.
+
+**1. Install `llama.cpp`** (macOS and Linux via brew):
+
+```sh
+brew install llama.cpp
+```
+
+Or build from source (see [`llama.cpp` README](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md)):
+
+```sh
+git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp
+cmake -B build && cmake --build build --config Release
+```
+
+**2. Run the bundled Makefile targets.** Defaults host `Qwen2.5-Coder-1.5B-Instruct-GGUF` (bartowski repack, Q4_K_M quantization, ~1 GB download on first pull) on `127.0.0.1:8000`:
+
+```sh
+make model-pull          # warm the HF cache; downloads once to ~/.cache/huggingface
+make model               # start llama-server on port 8000 (Ctrl+C to stop)
+make model-stop          # kill the running server
+make model-logs          # confirm what's listening
+```
+
+**3. Point VS Code at it.** In user settings, set:
+
+```json
+"completion.modelUrl": "http://127.0.0.1:8000",
+"completion.model": "qwen2.5-coder-1.5b-instruct"
+```
+
+`modelApiKey` can stay empty — `llama-server` accepts any bearer (or none). Reload the dev-host window.
+
+**4. Watch the telemetry pick it up.** With Phoenix running (`cd telemetry && mix phx.server`), `curl http://localhost:4000/api/v1/stats` should flip events' `"provider"` from `"mock"` → `"model"`.
+
+**Swap the model.** Override the Makefile variables for a different repo/quantization/port:
+
+```sh
+make model HF_REPO=bartowski/Qwen2.5-Coder-7B-Instruct-GGUF \
+           HF_FILE=Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf \
+           MODEL_PORT=8001
+```
+
+Cache location: HF default (`~/.cache/huggingface`) unless you export `LLAMA_CACHE`. Auth-token-protected HF repos need `HF_TOKEN` exported before `make model-pull`.
+
 ## Run
 
 Three terminals, plus a VS Code dev-host window:

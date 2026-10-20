@@ -11,12 +11,12 @@ Three processes, two hops, one frozen contract. The frozen wire shapes live in [
 │  ┌────────────────────────┐  │ stdin/  │  ┌────────────────────┐  │         │  ┌──────────────────┐  │
 │  │ extension.ts           │  │ stdout  │  │ rpc.rs    (JSON-   │  │         │  │ TelemetryStore   │  │
 │  │  • spawn sidecar       │─▶│headers  │─▶│           RPC)     │─│────────▶│  │  (Agent, 500-cap │  │
-│  │  • inline completion   │  │ +frame  │  │ documents.rs       │  │ teletele│  │   in-memory)     │  │
+│  │  • inline completion   │  │ +frame  │  │ documents.rs       │  │ teleme- │  │   in-memory)     │  │
 │  │    provider            │◀─│         │◀─│ context.rs (excerpt│◀│ │ POST   │  └──────────────────┘  │
 │  │  • document sync       │  │         │  │ index.rs  (BM25)   │  │ async   │          │             │
 │  └────────────────────────┘  │         │  │ syntax.rs (ts)     │  │         │          │ read API    │
 │                              │         │  │ inference.rs (FIM) │  │         │          ▼             │
-│  Output channel:             │         │  │ telemetry.rs       │  │         │  GET telemetry/*       │
+│  Output channel:             │         │  │ telemetry.rs       │  │         │  GET /api/v1/*         │
 │   "Completion Sidecar"       │         │  └────────────────────┘  │         └────────────────────────┘
 └──────────────────────────────┘         └────────────┬─────────────┘
                                                       │
@@ -61,13 +61,12 @@ Body: `{model, prompt, max_tokens: 128, temperature: 0.2, stop: []}`. The sideca
 
 Response (200): OpenAI-compatible `{"choices":[{"text":…, "finish_reason":…}]}`. Errors map to JSON-RPC `-32002`.
 
-When `model_url` is empty, the sidecar's mock path returns a static determin string (the `// hello from mock backend` marker).
+When `model_url` is empty, the sidecar's mock path returns a static deterministic string (the `// hello from mock backend` marker).
 
 ## Hop 3 — Sidecar ↔ Phoenix (telemetry, asynchronous)
 
 Fire-and-forget, never blocks the editor:
 
-```
 ```
 POST {telemetry_url}/api/v1/completions
 Content-Type: application/json
@@ -86,4 +85,4 @@ Body: `{request_id, language, file_path, prompt, response, latency_ms, provider,
 - Frame cap: malformed Content-Length headers terminate the sidecar; 256 KB per-frame cap enforced on both sides.
 - Bearer auth for both HTTP hops (`telemetry_api_key` for telemetry, `model_api_key` for inference).
 
-Full field-by-field contract, error table, and timeouts: [protocol/README.md](../protocol/README.md) (frozen v1.1).
+Full field-by-field contract, error table, and timeouts: [protocol/README.md](../protocol/README.md) (frozen v1.2).

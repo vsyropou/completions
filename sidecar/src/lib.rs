@@ -30,10 +30,9 @@ pub struct Config {
 
 /// The mutable fields behind `Config`. Lock, mutate, drop.
 pub struct Inner {
-    pub phoenix_url: String,
-    pub auth_token: String,
+    pub telemetry_url: String,
+    pub telemetry_api_key: String,
     pub workspace_root: String,
-    pub max_tokens_default: u32,
     pub measure_latency: bool,
     pub http: reqwest::Client,
     pub model_url: Option<String>,
@@ -51,10 +50,9 @@ impl Default for Config {
             .expect("reqwest client");
         Self {
             inner: Arc::new(Mutex::new(Inner {
-                phoenix_url: String::new(),
-                auth_token: String::new(),
+                telemetry_url: String::new(),
+                telemetry_api_key: String::new(),
                 workspace_root: String::new(),
-                max_tokens_default: 128,
                 measure_latency: false,
                 http,
                 model_url: None,
@@ -68,13 +66,12 @@ impl Default for Config {
 
 impl Config {
     /// Take a snapshot of the config needed for one HTTP call.
-    pub async fn snapshot(&self) -> (String, String, String, u32, bool, reqwest::Client) {
+    pub async fn snapshot(&self) -> (String, String, String, bool, reqwest::Client) {
         let g = self.inner.lock().await;
         (
-            g.phoenix_url.clone(),
-            g.auth_token.clone(),
+            g.telemetry_url.clone(),
+            g.telemetry_api_key.clone(),
             g.workspace_root.clone(),
-            g.max_tokens_default,
             g.measure_latency,
             g.http.clone(),
         )
@@ -274,9 +271,10 @@ async fn write_err(writer: &Arc<Mutex<tokio::io::Stdout>>, id: RequestId, e: Jso
     write(writer, e.into_response(id)).await;
 }
 
-/// Handle `initialize`: pull `phoenix_url`, `auth_token`, `workspace_root`,
-/// `max_tokens`, `measure_latency` out of params, stash them in `Config`, and
-/// spawn workspace indexing in the background so completions never wait on it.
+/// Handle `initialize`: pull `telemetry_url`, `telemetry_api_key`,
+/// `workspace_root`, `measure_latency` (and the optional `model_*` fields) out
+/// of params, stash them in `Config`, and spawn workspace indexing in the
+/// background so completions never wait on it.
 async fn handle_initialize(
     cfg: &Config,
     val: &serde_json::Value,
@@ -285,13 +283,13 @@ async fn handle_initialize(
     let params = val
         .get("params")
         .ok_or_else(|| JsonRpcError::invalid_params("params required"))?;
-    let phoenix_url = params
-        .get("phoenix_url")
+    let telemetry_url = params
+        .get("telemetry_url")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| JsonRpcError::invalid_params("phoenix_url required"))?
+        .ok_or_else(|| JsonRpcError::invalid_params("telemetry_url required"))?
         .to_owned();
-    let auth_token = params
-        .get("auth_token")
+    let telemetry_api_key = params
+        .get("telemetry_api_key")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_owned();
@@ -300,11 +298,6 @@ async fn handle_initialize(
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_owned();
-    let max_tokens = params
-        .get("max_tokens")
-        .and_then(|v| v.as_u64())
-        .map(|v| v as u32)
-        .unwrap_or(128);
     let measure_latency = params
         .get("measure_latency")
         .and_then(|v| v.as_bool())
@@ -328,10 +321,9 @@ async fn handle_initialize(
 
     {
         let mut g = cfg.inner.lock().await;
-        g.phoenix_url = phoenix_url;
-        g.auth_token = auth_token;
+        g.telemetry_url = telemetry_url;
+        g.telemetry_api_key = telemetry_api_key;
         g.workspace_root = workspace_root.clone();
-        g.max_tokens_default = max_tokens;
         g.measure_latency = measure_latency;
         g.model_url = model_url;
         g.model_api_key = model_api_key;

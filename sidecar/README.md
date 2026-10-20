@@ -51,9 +51,8 @@ Run standalone — the binary sits silently on stdin. Drive it from `integration
 | Param          | Type           | Default                                  | Used for                       |
 |----------------|----------------|------------------------------------------|--------------------------------|
 | `workspace_root` | string         | —                                        | Workspace URI; sets index scope |
-| `phoenix_url`    | string         | —                                        | Telemetry sink URL             |
-| `auth_token`     | string         | —                                        | Bearer to Phoenix              |
-| `max_tokens`     | int            | 128                                      | Max completion tokens           |
+| `telemetry_url`  | string         | —                                        | Telemetry sink URL             |
+| `telemetry_api_key`| string         | —                                      | Bearer to telemetry sink       |
 | `measure_latency`| bool           | false                                    | Verbose stderr latency logs    |
 | `model_url`      | string or null | —                                        | Inference base URL             |
 | `model_api_key`  | string or null | —                                        | Bearer to inference            |
@@ -65,5 +64,5 @@ Anything else in `initialize.params` is ignored (forward-compat).
 ## Docs
 
 - Dispatch / shared state: `lib.rs` header docs.
-- JSON-RPC wire shape: `../../protocol/README.md` (frozen v1.1).
+- JSON-RPC wire shape: `../../protocol/README.md` (frozen v1.2).
 - Tree-sitter per-language node names: `index.rs::extract`.

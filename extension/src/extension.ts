@@ -146,15 +146,14 @@ function spawnSidecar(context: vscode.ExtensionContext): boolean {
   return true;
 }
 
-// Hand the sidecar the workspace root + Phoenix connection settings,
+// Hand the sidecar the workspace root + telemetry connection settings,
 // then replay `didOpen` for every file the editor already has open.
 async function initializeAndSync() {
   const cfg = config();
   await sendRequest("initialize", {
     workspace_root: vscode.workspace.workspaceFolders?.[0]?.uri.toString() ?? "file:///",
-    phoenix_url: cfg.get<string>("phoenixUrl"),
-    auth_token: cfg.get<string>("authToken"),
-    max_tokens: cfg.get<number>("maxTokens"),
+    telemetry_url: cfg.get<string>("telemetryUrl"),
+    telemetry_api_key: cfg.get<string>("telemetryApiKey"),
     measure_latency: cfg.get<boolean>("measureLatency"),
     model_url: cfg.get<string>("modelUrl"),
     model_api_key: cfg.get<string>("modelApiKey"),

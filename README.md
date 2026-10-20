@@ -50,7 +50,7 @@ node integration-tests/e2e.mjs
 2. **Framing.** LSP-style headers (`Content-Length: N\r\n\r\n` + JSON body) — see `extension/src/framing.ts` on the writer side and `sidecar/src/rpc.rs` on the reader side.
 3. **Dispatch.** `sidecar/src/lib.rs::run` reads frames, dispatches on `method` — `initialize`, document notifications, `completion/request`, `completion/cancel`, `shutdown`. Document state lives in `documents.rs`; syntax/OPL extraction in `syntax.rs` (tree-sitter, 14 languages) + `index.rs`; prompt-shape in `context.rs` (cursor-excerpt + repo BM25).
 4. **Inference.** `sidecar/src/inference.rs` builds the FIM prompt (template + repo context + prefix/suffix) and POSTs to `{model_url}/v1/completions` directly. Mock provider returns a static string when `model_url` is unset.
-5. **Telemetry.** After the inference returns, `sidecar/src/telemetry.rs` fires a detached POST to `{phoenix_url}/api/v1/telemetry/completions` with the full prompt+response+latency. Never blocks the editor.
+5. **Telemetry.** After the inference returns, `sidecar/src/telemetry.rs` fires a detached POST to `{telemetry_url}/api/v1/telemetry/completions` with the full prompt+response+latency. Never blocks the editor.
 6. **Back.** The sidecar maps the inference result into a JSON-RPC response `{text, document_version}` → extension wraps it as a `vscode.InlineCompletionItem` → VS Code renders ghost text.
 
 ## Phoenix telemetry read API

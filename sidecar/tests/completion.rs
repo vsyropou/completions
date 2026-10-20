@@ -14,7 +14,7 @@ async fn mock_config() -> Config {
     {
         let mut g = cfg.inner.lock().await;
         g.workspace_root = "file:///repo".into();
-        g.max_tokens_default = 128;
+        // max_tokens_default was removed in v1.2 — nothing to set.
     }
     cfg
 }

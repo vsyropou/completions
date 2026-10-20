@@ -71,9 +71,8 @@ try {
   // -- Step b: initialize ------------------------------------------------------
   const init = await request("initialize", {
     workspace_root: "file:///tmp",
-    phoenix_url: "http://localhost:4000",
-    auth_token: "dev-token",
-    max_tokens: 128,
+    telemetry_url: "http://localhost:4000",
+    telemetry_api_key: "dev-token",
   });
   assert.equal(init.id, 1, "initialize response id must echo request id");
   console.log("[2/5] initialize ok, capabilities:", JSON.stringify(init.result));

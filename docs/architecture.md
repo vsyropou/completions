@@ -36,7 +36,7 @@ LSP-style framing: `Content-Length: N\r\n\r\n<json>`. stdout is protocol-only; l
 
 Requests (response expected):
 
-- `initialize` — handshake; sends `workspace_root`, `phoenix_url`, `auth_token`, `max_tokens`, `measure_latency`, plus inference config `model_url` / `model_api_key` / `model` / `fim_template`. Returns `capabilities`.
+- `initialize` — handshake; sends `workspace_root`, `telemetry_url`, `telemetry_api_key`, `measure_latency`, plus inference config `model_url` / `model_api_key` / `model` / `fim_template`. Returns `capabilities`.
 - `completion/request` — ask for a completion. Params: `document_uri`, `document_version`, `position {line, character}` (UTF-16, zero-based). Returns `{text, document_version}` or a JSON-RPC error (`-32000` unknown document, `-32001` stale version, `-32002` upstream error, `-32003` cancelled).
 - `shutdown` — graceful exit; sidecar responds then exits 0.
 
@@ -68,9 +68,10 @@ When `model_url` is empty, the sidecar's mock path returns a static determin str
 Fire-and-forget, never blocks the editor:
 
 ```
-POST {phoenix_url}/api/v1/telemetry/completions
+```
+POST {telemetry_url}/api/v1/telemetry/completions
 Content-Type: application/json
-Authorization: Bearer {auth_token}
+Authorization: Bearer {telemetry_api_key}
 ```
 
 Body: `{request_id, language, file_path, prompt, response, latency_ms, provider, model, finish_reason}`. Phoenix stores to an in-memory Agent (500-event cap) and replies `202` — the sidecar does not await.
@@ -83,6 +84,6 @@ Body: `{request_id, language, file_path, prompt, response, latency_ms, provider,
 - Cancellation: `-32003`, claimed atomically via one Mutex over pending+answered state — no double-send.
 - Debounce: 200 ms per URI, latest-wins. Superseded requests return `-32003`.
 - Frame cap: malformed Content-Length headers terminate the sidecar; 256 KB per-frame cap enforced on both sides.
-- Bearer auth for both HTTP hops (`auth_token` for telemetry, `model_api_key` for inference).
+- Bearer auth for both HTTP hops (`telemetry_api_key` for telemetry, `model_api_key` for inference).
 
 Full field-by-field contract, error table, and timeouts: [protocol/README.md](../protocol/README.md) (frozen v1.1).

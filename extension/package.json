@@ -36,20 +36,15 @@
           "default": "",
           "description": "Override sidecar binary path (dev use)"
         },
-        "completion.phoenixUrl": {
+        "completion.telemetryUrl": {
           "type": "string",
           "default": "http://localhost:4000",
-          "description": "Phoenix backend URL"
+          "description": "Telemetry sink URL (Phoenix). Empty = telemetry disabled."
         },
-        "completion.authToken": {
+        "completion.telemetryApiKey": {
           "type": "string",
           "default": "dev-token",
-          "description": "Phoenix bearer token"
-        },
-        "completion.maxTokens": {
-          "type": "number",
-          "default": 128,
-          "description": "Max tokens per completion"
+          "description": "Bearer token for the telemetry sink (matches telemetry server's AUTH_TOKEN)."
         },
         "completion.measureLatency": {
           "type": "boolean",

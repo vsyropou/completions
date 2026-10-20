@@ -46,14 +46,13 @@ async fn serve_one(listener: TcpListener, delay: Duration) -> String {
     String::from_utf8(raw).unwrap()
 }
 
-async fn cfg_with_phoenix(phoenix_url: Option<String>) -> Config {
+async fn cfg_with_telemetry(telemetry_url: Option<String>) -> Config {
     let cfg = Config::default();
     {
         let mut g = cfg.inner.lock().await;
         g.workspace_root = "file:///repo".into();
-        g.max_tokens_default = 128;
-        g.phoenix_url = phoenix_url.unwrap_or_default();
-        g.auth_token = "test-token".into();
+        g.telemetry_url = telemetry_url.unwrap_or_default();
+        g.telemetry_api_key = "test-token".into();
         // model_url None → mock path → inference returns instantly.
         g.model_url = None;
     }
@@ -91,7 +90,7 @@ async fn telemetry_body_has_all_fields() {
     let addr = listener.local_addr().unwrap();
     let server = tokio::spawn(serve_one(listener, Duration::ZERO));
 
-    let cfg = cfg_with_phoenix(Some(format!("http://{addr}"))).await;
+    let cfg = cfg_with_telemetry(Some(format!("http://{addr}"))).await;
     let docs = open_documents().await;
     let res = handle_completion_request(
         cfg,
@@ -161,7 +160,7 @@ async fn completion_returns_even_when_sink_hangs() {
     // Sink: read body, then hang for 2s before replying. Sidecar must not wait.
     let server = tokio::spawn(serve_one(listener, Duration::from_millis(2000)));
 
-    let cfg = cfg_with_phoenix(Some(format!("http://{addr}"))).await;
+    let cfg = cfg_with_telemetry(Some(format!("http://{addr}"))).await;
     let docs = open_documents().await;
     let t0 = Instant::now();
     let res = handle_completion_request(
@@ -183,11 +182,11 @@ async fn completion_returns_even_when_sink_hangs() {
 }
 
 #[tokio::test]
-async fn no_http_attempt_when_phoenix_url_unset() {
-    // Empty phoenix_url → telemetry::fire returns early. Nothing to observe
+async fn no_http_attempt_when_telemetry_url_unset() {
+    // Empty telemetry_url → telemetry::fire returns early. Nothing to observe
     // externally; the completion path must still succeed with no panics, and a
     // closed port would have errored loudly if we'd tried it.
-    let cfg = cfg_with_phoenix(None).await;
+    let cfg = cfg_with_telemetry(None).await;
     let docs = open_documents().await;
     let res = handle_completion_request(
         cfg,

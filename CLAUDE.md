@@ -76,6 +76,8 @@ package.json contributes ──▶ extension.ts activate() ──▶ initialize.
 | `completion.modelApiKey`  | `model_api_key`     | `model_api_key`   | Bearer header, iff set                  |
 | `completion.model`        | `model`             | `model`           | Model id sent to inference; `default`   |
 | `completion.fimTemplate`  | `fim_template`      | `fim_template`    | FIM string with `{prefix}`/`{suffix}`   |
+| `completion.telemetryUrl` | `telemetry_url`     | `telemetry_url`   | Telemetry sink URL; empty = disabled    |
+| `completion.telemetryApiKey`| `telemetry_api_key`| `telemetry_api_key`| Bearer to telemetry sink             |
 
 To try a real model, set `modelUrl` + `model` (+ `modelApiKey` if your server needs auth), reload the dev-host window, then watch `GET /api/v1/telemetry/stats` flip `"provider":"mock"` → `"provider":"model"`.
 

@@ -18927,33 +18927,3 @@ Type: :worker
 10:20:04.277 instance_id=1A157F785EB [debug] Node port message: 
 10:20:04.277 [debug] sent notification server -> client $/progress
 
-
-10:24:56.619 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
-
-10:24:56.618 instance_id=1A157F785EB [info] Resolved entity: {:module, CompleteWeb.Plugs.Auth}
-
-10:24:56.619 instance_id=1A157F785EB [debug] sent notification server -> client window/logMessage
-
-10:24:56.618 instance_id=1A157F785EB [info] Resolved entity: {:variable, :expected}
-
-10:24:56.628 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 42ms
-
-10:24:56.804 instance_id=1A157F785EB [debug] handled request client -> server textDocument/codeAction in 221ms
-
-13:28:33.732 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didClose in 1ms
-
-13:28:35.174 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didClose in 186µs
-
-13:28:36.371 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didClose in 258µs
-
-13:28:38.008 instance_id=1A157F785EB [debug] handled notification client -> server textDocument/didClose in 185µs
-
-13:28:38.747 instance_id=1A157F785EB [debug] handled request client -> server textDocument/hover in 17ms
-
-13:28:39.372 instance_id=1A157F785EB [debug] handled request client -> server textDocument/hover in 2ms
-
-13:28:39.600 instance_id=1A157F785EB [debug] handled request client -> server textDocument/hover in 4ms
-
-13:28:40.891 instance_id=1A157F785EB [debug] handled request client -> server textDocument/hover in 4ms
-
-13:28:42.049 instance_id=1A157F785EB [debug] handled request client -> server textDocument/hover in 4ms

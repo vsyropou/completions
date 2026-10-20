@@ -30,7 +30,7 @@ The Rust sidecar is the smart one: it does prompt assembly (FIM templating), cal
 
 ## Commands
 
-Three sibling components, no top-level build. Run from each dir.
+Three sibling components, no top-level build. Run from each dir. A [`Makefile`](./Makefile) orchestrates `make compile | package | install | uninstall | clean` for packaging the extension (compiles sidecar release + extension, stages a `.vsix`, and `code --install-extension`).
 
 **Telemetry** (`telemetry/`, Elixir pinned via `.tool-versions`: erlang 28.2, elixir 1.18.4-otp-28):
 ```sh

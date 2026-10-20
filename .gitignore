@@ -1,6 +1,21 @@
+# Editors
+.expert/
+.elixir_ls/
+.zed/
+.vscode/
+
+# OS junk
+.DS_Store
+
+# Build output (covered per-component too, but ignore at the root so sub-dirs can't sneak in)
 node_modules/
 out/
 target/
 _build/
 deps/
+
+# Packaged artifacts
 *.vsix
+
+# Staged sidecar binary (built by `make compile`)
+extension/bin/sidecar

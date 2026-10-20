@@ -22,7 +22,7 @@ Top-level layout:
 
 ## Install
 
-Each component has its own toolchain. Elixir/Erlang pinned via [`telemetry/.tool-versions`](./telemetry/.tool-versions) (erlang 28.2, elixir 1.18.4-otp-28) — install via asdf/mise first.
+Each component has its own toolchain. Elixir/Erlang pinned via [`telemetry/.tool-versions`](./telemetry/.tool-versions) (erlang 29.1.2, elixir 1.20.4-otp-29) — install via asdf/mise first.
 
 ```sh
 cd telemetry && mix setup                                       # deps.get

@@ -4,7 +4,14 @@
   "description": "Low-latency multiline code completion",
   "version": "0.0.1",
   "publisher": "vasilis",
-  "engines": { "vscode": "^1.85.0" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vsyropou/completions",
+    "directory": "extension"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
   "activationEvents": [
     "onLanguage:typescript",
     "onLanguage:typescriptreact",
@@ -31,30 +38,9 @@
     "configuration": {
       "title": "Completion",
       "properties": {
-        "completion.sidecarPath": {
-          "type": "string",
-          "default": "",
-          "description": "Override sidecar binary path (dev use)"
-        },
-        "completion.telemetryUrl": {
-          "type": "string",
-          "default": "http://localhost:4000",
-          "description": "Telemetry sink URL (Phoenix). Empty = telemetry disabled."
-        },
-        "completion.telemetryApiKey": {
-          "type": "string",
-          "default": "dev-token",
-          "description": "Bearer token for the telemetry sink (matches telemetry server's AUTH_TOKEN)."
-        },
-        "completion.measureLatency": {
-          "type": "boolean",
-          "default": false,
-          "description": "Log per-request latency breakdown to the output channel"
-        },
         "completion.modelUrl": {
           "type": "string",
-          "default": "",
-          "description": "Base URL of the model server, e.g. http://localhost:8000. Empty = mock completions."
+          "description": "Base URL of the model server, e.g. http://localhost:8000."
         },
         "completion.modelApiKey": {
           "type": "string",
@@ -64,12 +50,7 @@
         "completion.model": {
           "type": "string",
           "default": "",
-          "description": "Model id, e.g. qwen2.5-coder-7b. Empty = 'default'."
-        },
-        "completion.fimTemplate": {
-          "type": "string",
-          "default": "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>",
-          "description": "FIM template with {prefix} and {suffix} placeholders."
+          "description": "Model id, e.g. qwen2.5-coder-7b. Empty: server decides which model to use."
         },
         "completion.temperature": {
           "type": "number",
@@ -80,6 +61,31 @@
           "type": "number",
           "default": 32,
           "description": "Maximum tokens to generate. 32 ≈ 1–3 lines of ghost text; anything larger drifts into codegen."
+        },
+        "completion.telemetryUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Telemetry sink URL, e.g. http://localhost:4000. Empty = telemetry disabled."
+        },
+        "completion.telemetryApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Bearer token for the telemetry sink. Empty = no auth header."
+        },
+        "completion.measureLatency": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log per-request latency breakdown to the output channel"
+        },
+        "completion.fimTemplate": {
+          "type": "string",
+          "default": "<|fim_prefix|>{prefix}<|fim_suffix|>{suffix}<|fim_middle|>",
+          "description": "FIM template with {prefix} and {suffix} placeholders (dev only use)."
+        },
+        "completion.sidecarPath": {
+          "type": "string",
+          "default": "",
+          "description": "Override sidecar binary path (dev only use)"
         }
       }
     }

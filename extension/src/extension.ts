@@ -67,7 +67,7 @@ function config() {
 function sidecarPath(context: vscode.ExtensionContext): string | undefined {
   const override = config().get<string>("sidecarPath");
   if (override) return override;
-  const exe = `sidecar-${process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`;
+  const exe = `sidecar${process.platform === "win32" ? ".exe" : ""}`;
   return path.join(context.extensionPath, "bin", exe);
 }
 

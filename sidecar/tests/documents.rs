@@ -64,7 +64,6 @@ async fn version_regression_resets_nothing() {
     let docs = Documents::default();
     open(&docs, "u", "a", 1).await;
     change(&docs, "u", "b", 2).await;
-    let edits_before = docs.recent_edits("u").await;
     assert!(
         change_result(&docs, "u", "z", 1).await.is_err(),
         "regression must fail"
@@ -72,7 +71,6 @@ async fn version_regression_resets_nothing() {
     let doc = docs.get("u").await.unwrap();
     assert_eq!(doc.text, "b");
     assert_eq!(doc.version, 2);
-    assert_eq!(docs.recent_edits("u").await.len(), edits_before.len());
 }
 
 #[tokio::test]
@@ -85,38 +83,10 @@ async fn did_change_for_unopened_doc_is_rejected() {
 }
 
 #[tokio::test]
-async fn edit_history_ring_records_up_to_five() {
+async fn did_close_removes_document() {
     let docs = Documents::default();
-    open(&docs, "u", "hello world", 1).await;
-    assert!(docs.recent_edits("u").await.is_empty());
-
-    for v in 2..=8 {
-        change(&docs, "u", &format!("hello world v{v}"), v).await;
-    }
-    let edits = docs.recent_edits("u").await;
-    // Ring cap is 5 — mirrors EDIT_HISTORY_LEN in src/documents.rs.
-    assert_eq!(edits.len(), 5, "ring caps at five");
-    // Oldest in ring is v4 (v2 and v3 evicted), newest is v8.
-    assert_eq!(edits[0].version, 4);
-    assert_eq!(edits[4].version, 8);
-    // Last change was "v7" → "v8": only the digit differs, so preview is "8".
-    assert!(edits[4].preview.contains('8'), "preview: {}", edits[4].preview);
-    assert_eq!(edits[4].deleted_len, 1); // one digit replaced
-
-    // didClose wipes the ring.
+    open(&docs, "u", "hello", 1).await;
+    assert!(docs.get("u").await.is_some());
     docs.did_close(&serde_json::json!({ "uri": "u" })).await;
-    assert!(docs.recent_edits("u").await.is_empty());
-}
-
-#[tokio::test]
-async fn edit_history_offsets_and_preview() {
-    let docs = Documents::default();
-    open(&docs, "u", "fn main() {}", 1).await;
-    change(&docs, "u", "fn main() { return 1; }", 2).await;
-    let edits = docs.recent_edits("u").await;
-    assert_eq!(edits.len(), 1);
-    let e = &edits[0];
-    // Common prefix "fn main() {" is 11 bytes; insertion happens at offset 11.
-    assert_eq!(e.offset, 11);
-    assert!(e.preview.contains("return 1;"), "preview: {}", e.preview);
+    assert!(docs.get("u").await.is_none());
 }

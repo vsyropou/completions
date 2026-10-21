@@ -190,7 +190,11 @@ pub async fn handle_completion_request(
     let suffix = cap_suffix(&doc.text[offset..excerpt.end_byte], SUFFIX_CAP).to_owned();
 
     let workspace_root = cfg.inner.lock().await.workspace_root.clone();
-    let request_id = uuid::Uuid::new_v4().to_string();
+    static NEXT_REQ_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let request_id = format!(
+        "req-{}",
+        NEXT_REQ_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
     let language = doc.language.clone();
     let file_path = crate::repo_relative_str(&workspace_root, &p.document_uri);
 

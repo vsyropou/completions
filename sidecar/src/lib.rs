@@ -377,12 +377,7 @@ async fn handle_initialize(
         });
     }
 
-    Ok(serde_json::json!({ "capabilities": { "languages": [
-        "typescript", "tsx", "javascript", "jsx",
-        "python", "rust", "go", "java",
-        "c", "cpp", "csharp",
-        "elixir", "json", "yaml",
-    ] } }))
+    Ok(serde_json::json!({}))
 }
 
 /// Convert a `file:///repo` URI to a filesystem path. `None` if empty.

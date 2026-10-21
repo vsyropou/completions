@@ -16,17 +16,6 @@ pub enum RequestId {
     Null,
 }
 
-/// JSON-RPC response envelope. Either `result` or `error` is set, never both.
-#[derive(Debug, Serialize)]
-pub struct Response {
-    pub jsonrpc: &'static str,
-    pub id: RequestId,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<JsonRpcError>,
-}
-
 /// JSON-RPC error object. Codes follow `protocol/README.md` §2.2.
 /// Optional `data` is serialized on the wire as the error object's `data` key
 /// (JSON-RPC 2.0 §5.1); used here only for -32001 to carry the current version.

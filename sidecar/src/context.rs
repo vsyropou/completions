@@ -291,49 +291,6 @@ fn name_of(node: &Node, text: &str) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-/// First N import statements of the document (raw source text lines).
-pub fn imports_of(tree: &Tree, text: &str, cap: usize) -> Vec<String> {
-    let root = tree.root_node();
-    let mut cursor = root.walk();
-    let mut out = Vec::new();
-    for child in root.children(&mut cursor) {
-        if child.kind() == "import_statement" {
-            if out.len() >= cap {
-                break;
-            }
-            if let Ok(t) = child.utf8_text(text.as_bytes()) {
-                out.push(t.trim_end_matches(['\n', ';']).to_string() + ";");
-            }
-        }
-    }
-    out
-}
-
-/// Import specifiers (the "./y" parts) — for symbol lookup.
-pub fn import_specifiers(tree: &Tree, text: &str, cap: usize) -> Vec<String> {
-    let root = tree.root_node();
-    let mut cursor = root.walk();
-    let mut out = Vec::new();
-    for child in root.children(&mut cursor) {
-        if child.kind() == "import_statement" {
-            if out.len() >= cap {
-                break;
-            }
-            let mut cur = child.walk();
-            for c in child.children(&mut cur) {
-                if c.kind() == "string" {
-                    if let Ok(s) = c.utf8_text(text.as_bytes()) {
-                        let t = s.trim_matches(&['"', '\''][..]).to_string();
-                        out.push(t);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    out
-}
-
 /// True if the index has content for `p` (any file indexed via `set_text`).
 /// Used as the "does the file exist in the workspace" probe for import resolution.
 async fn indexed_exists(index: &Index, p: &Path) -> bool {
@@ -443,12 +400,6 @@ pub async fn resolve_python_import(
 ///  - `super::foo` → walk up one dir per `super::` prefix.
 ///  - `self::foo` → current dir.
 ///  - `foo` (no prefix) → external crate; not resolved.
-/// Rust:
-///  - `crate::foo::Bar` / `crate::foo` → `foo/Bar.rs` / `foo.rs` / `foo/mod.rs`, walking up
-///    (approximates "Cargo project root" without needing `Cargo.toml`).
-///  - `super::foo` → walk up one dir per `super::` prefix.
-///  - `self::foo` → current dir.
-///  - `foo` (no prefix) → external crate; not resolved.
 pub async fn resolve_rust_import(index: &Index, current_file: &str, spec: &str) -> Option<PathBuf> {
     // Spec may carry trailing braces / names like "crate::foo::{Bar, Baz}" or "crate::foo::Bar".
     // Normalize to the longest path-like prefix.
@@ -541,8 +492,6 @@ pub async fn resolve_rust_import(index: &Index, current_file: &str, spec: &str) 
 
 /// Go: only relative "./foo" is resolvable. Real Go imports are module paths and
 /// can't be mapped without go.mod parsing — skip them.
-/// Go: only relative "./foo" is resolvable. Real Go imports are module paths and
-/// can't be mapped without go.mod parsing — skip them.
 pub async fn resolve_go_import(index: &Index, current_file: &str, spec: &str) -> Option<PathBuf> {
     if !spec.starts_with("./") {
         return None;
@@ -556,8 +505,6 @@ pub async fn resolve_go_import(index: &Index, current_file: &str, spec: &str) ->
     None
 }
 
-/// Java: `com.foo.Bar` → `com/foo/Bar.java`, rooted at any ancestor of the
-/// importing file or under an ancestor's `src/main/java/`.
 /// Java: `com.foo.Bar` → `com/foo/Bar.java`, rooted at any ancestor of the
 /// importing file or under an ancestor's `src/main/java/`.
 pub async fn resolve_java_import(index: &Index, current_file: &str, spec: &str) -> Option<PathBuf> {
@@ -578,13 +525,8 @@ pub async fn resolve_java_import(index: &Index, current_file: &str, spec: &str) 
 
 /// C/Cpp: quoted `#include "foo.h"` resolves adjacent to the importer, then in
 /// ancestor dirs of the project root. Angle includes are system headers — skip.
-/// Note: `extract_c_cpp` strips `<...>`/`"..."` already, so we can't tell the
-/// two apart here; we attempt resolution only when the import looks like a file
-/// (has a path-ish or `.h`-ish shape). Angle includes will simply fail lookup.
-/// C/Cpp: quoted `#include "foo.h"` resolves adjacent to the importer, then in
-/// ancestor dirs of the project root. Angle includes are system headers — skip.
-/// Note: `extract_c_cpp` strips `<...>`/`"..."` already, so we can't tell the
-/// two apart here; we attempt resolution only when the import looks like a file
+/// `extract_c_cpp` strips `<...>`/`"..."` already, so we can't tell the two
+/// apart here; we attempt resolution only when the import looks like a file
 /// (has a path-ish or `.h`-ish shape). Angle includes will simply fail lookup.
 pub async fn resolve_c_include(index: &Index, current_file: &str, spec: &str) -> Option<PathBuf> {
     // Cheap system-header gate: no path separator and no common C/C++ header ext.

@@ -3,7 +3,7 @@
 
 use sidecar::context::{
     build_repository_context, compute_cursor_excerpt, enclosing_at, identifiers_near_cursor,
-    import_specifiers, imports_of, linewise_symmetric_expansion, resolve_c_include,
+    linewise_symmetric_expansion, resolve_c_include,
     resolve_go_import, resolve_import, resolve_import_for, resolve_java_import,
     resolve_python_import, resolve_rust_import, BYTES_PER_TOKEN_GUESS, REPO_CTX_CAP,
 };
@@ -37,17 +37,6 @@ fn enclosing_class_for_method_inner_cursor() {
     let enc = enclosing_at(&t, src, offset);
     assert_eq!(enc.class.as_deref(), Some("Foo"));
     assert_eq!(enc.function.as_deref(), Some("bar"));
-}
-
-#[test]
-fn import_lines_extracted() {
-    let src = "import { foo } from \"./y\";\nimport * as z from \"../z\";\nconst a = 1;\n";
-    let t = tree_for(src);
-    let imports = imports_of(&t, src, 8);
-    assert_eq!(imports.len(), 2);
-    assert_eq!(imports[0], "import { foo } from \"./y\";");
-    let specs = import_specifiers(&t, src, 8);
-    assert_eq!(specs, vec!["./y", "../z"]);
 }
 
 #[test]

@@ -141,7 +141,6 @@ pub async fn handle_completion_request(
     req: serde_json::Value,
     debounce: Debounce,
 ) -> Result<serde_json::Value, JsonRpcError> {
-    let t0 = std::time::Instant::now();
     let params_value = req
         .get("params")
         .cloned()
@@ -190,8 +189,7 @@ pub async fn handle_completion_request(
     let prefix = cap_prefix(&doc.text[excerpt.start_byte..offset], PREFIX_CAP).to_owned();
     let suffix = cap_suffix(&doc.text[offset..excerpt.end_byte], SUFFIX_CAP).to_owned();
 
-    let (_telemetry_url, _telemetry_api_key, workspace_root, measure_latency, _http) =
-        cfg.snapshot().await;
+    let workspace_root = cfg.inner.lock().await.workspace_root.clone();
     let request_id = uuid::Uuid::new_v4().to_string();
     let language = doc.language.clone();
     let file_path = crate::repo_relative_str(&workspace_root, &p.document_uri);
@@ -250,16 +248,8 @@ pub async fn handle_completion_request(
         },
     );
 
-    let mut out = json!({
+    Ok(json!({
         "text": completion,
         "document_version": doc.version,
-    });
-    if measure_latency {
-        let total_ms = t0.elapsed().as_millis() as u64;
-        out.as_object_mut().unwrap().insert(
-            "latency_ms".to_string(),
-            json!({ "total": total_ms, "http": http_ms }),
-        );
-    }
-    Ok(out)
+    }))
 }

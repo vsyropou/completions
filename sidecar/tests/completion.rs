@@ -70,29 +70,6 @@ async fn unknown_document_returns_32000() {
     assert_eq!(err.code, -32000);
 }
 
-#[tokio::test]
-async fn latency_ms_present_when_opted_in() {
-    let cfg = mock_config().await;
-    cfg.inner.lock().await.measure_latency = true;
-    let docs = open_documents().await;
-    let res = handle_completion_request(cfg, docs, Index::default(), open_doc(), Debounce::default())
-        .await
-        .unwrap();
-    let lm = res["latency_ms"].as_object().expect("latency_ms present");
-    let total = lm["total"].as_u64().unwrap();
-    let http = lm["http"].as_u64().unwrap();
-    assert!(total >= http, "total={} http={}", total, http);
-
-    // Opt-in default false: same request without the flag yields no key.
-    let cfg2 = mock_config().await;
-    let docs2 = open_documents().await;
-    let res2 =
-        handle_completion_request(cfg2, docs2, Index::default(), open_doc(), Debounce::default())
-            .await
-            .unwrap();
-    assert!(res2.get("latency_ms").is_none());
-}
-
 #[test]
 fn utf16_basic_ascii() {
     assert_eq!(utf16_to_utf8_offset("hello\nworld", 1, 3).unwrap(), 9);

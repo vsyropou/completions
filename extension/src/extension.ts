@@ -154,7 +154,6 @@ async function initializeAndSync() {
     workspace_root: vscode.workspace.workspaceFolders?.[0]?.uri.toString() ?? "file:///",
     telemetry_url: cfg.get<string>("telemetryUrl"),
     telemetry_api_key: cfg.get<string>("telemetryApiKey"),
-    measure_latency: cfg.get<boolean>("measureLatency"),
     model_url: cfg.get<string>("modelUrl"),
     model_api_key: cfg.get<string>("modelApiKey"),
     model: cfg.get<string>("model") || undefined,

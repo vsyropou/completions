@@ -33,7 +33,6 @@ pub struct Inner {
     pub telemetry_url: String,
     pub telemetry_api_key: String,
     pub workspace_root: String,
-    pub measure_latency: bool,
     pub http: reqwest::Client,
     pub model_url: Option<String>,
     pub model_api_key: Option<String>,
@@ -55,7 +54,6 @@ impl Default for Config {
                 telemetry_url: String::new(),
                 telemetry_api_key: String::new(),
                 workspace_root: String::new(),
-                measure_latency: false,
                 http,
                 model_url: None,
                 model_api_key: None,
@@ -69,14 +67,12 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Take a snapshot of the config needed for one HTTP call.
-    pub async fn snapshot(&self) -> (String, String, String, bool, reqwest::Client) {
+    /// Snapshot the three fields `telemetry::fire` needs to POST one event.
+    pub async fn telemetry(&self) -> (String, String, reqwest::Client) {
         let g = self.inner.lock().await;
         (
             g.telemetry_url.clone(),
             g.telemetry_api_key.clone(),
-            g.workspace_root.clone(),
-            g.measure_latency,
             g.http.clone(),
         )
     }
@@ -323,10 +319,6 @@ async fn handle_initialize(
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_owned();
-    let measure_latency = params
-        .get("measure_latency")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
     let model_url = params
         .get("model_url")
         .and_then(|v| v.as_str())
@@ -357,7 +349,6 @@ async fn handle_initialize(
         g.telemetry_url = telemetry_url;
         g.telemetry_api_key = telemetry_api_key;
         g.workspace_root = workspace_root.clone();
-        g.measure_latency = measure_latency;
         g.model_url = model_url;
         g.model_api_key = model_api_key;
         g.model = model;

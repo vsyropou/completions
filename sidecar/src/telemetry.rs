@@ -25,14 +25,7 @@ pub struct Telemetry {
 /// Spawn the POST. Returns immediately; the task finishes whenever it finishes.
 pub fn fire(cfg: crate::Config, t: Telemetry) {
     tokio::spawn(async move {
-        let (telemetry_url, telemetry_api_key, http) = {
-            let g = cfg.inner.lock().await;
-            (
-                g.telemetry_url.clone(),
-                g.telemetry_api_key.clone(),
-                g.http.clone(),
-            )
-        };
+        let (telemetry_url, telemetry_api_key, http) = cfg.telemetry().await;
         if telemetry_url.is_empty() {
             return; // telemetry sink not configured — skip silently
         }

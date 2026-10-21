@@ -60,7 +60,7 @@
         "completion.maxTokens": {
           "type": "number",
           "default": 32,
-          "description": "Maximum tokens to generate. 32 ≈ 1–3 lines of ghost text; anything larger drifts into codegen."
+          "description": "Maximum tokens to generate. 32 \u2248 1\u20133 lines of ghost text; anything larger drifts into codegen."
         },
         "completion.telemetryUrl": {
           "type": "string",
@@ -71,11 +71,6 @@
           "type": "string",
           "default": "",
           "description": "Bearer token for the telemetry sink. Empty = no auth header."
-        },
-        "completion.measureLatency": {
-          "type": "boolean",
-          "default": false,
-          "description": "Log per-request latency breakdown to the output channel"
         },
         "completion.fimTemplate": {
           "type": "string",

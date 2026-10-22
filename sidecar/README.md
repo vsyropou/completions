@@ -17,19 +17,26 @@ For each typed character in the editor:
 
 ```
 src/
-  main.rs        # tracing init, calls sidecar::run
-  lib.rs         # dispatch loop, Config, shared state
-  rpc.rs         # Content-Length framing, JsonRpcError
-  documents.rs   # HashMap<Uri, Document>, version checks, edit history ring
-  completion.rs  # completion/request handler + debounce
-  syntax.rs      # tree-sitter Lang enum (14 languages) + NoParser
-  index.rs       # workspace walk, symbol extraction per Lang, BM25 ranker
-  context.rs     # cursor excerpt, identifier extraction, resolve_import
-  inference.rs   # FimAdapter port: build_prompt, complete() HTTP call
-  telemetry.rs   # fire-and-forget POST to Phoenix
+  main.rs            # tracing init, calls sidecar::run
+  lib.rs             # frame loop: reads stdin, maps methods to dispatch handlers
+  dispatch.rs        # one handler per JSON-RPC method, cancellation race
+  state.rs           # Config + Pending (shared state across handlers)
+  rpc.rs             # Content-Length framing, JsonRpcError
+  documents.rs       # HashMap<Uri, Document>, version checks
+  completion.rs      # completion/request handler + debounce
+  syntax.rs          # tree-sitter Lang enum (14 languages) + NoParser
+  index/             # workspace walk, per-language extractors, BM25 ranker
+    mod.rs           #   storage + bm25_rank
+    extract.rs       #   per-language tree-sitter extractors
+  context/           # cursor excerpt, repo-context assembly, import resolution
+    mod.rs           #   public surface + selection logic
+    fmt.rs           #   symbol-line formatting
+    resolve.rs       #   per-language import specifier → path
+  inference.rs       # FimAdapter port: build_prompt, complete() HTTP call
+  telemetry.rs       # fire-and-forget POST to Phoenix
 
-tests/           # mirrors src/ — 68 integration tests
-  {completion,context,dispatch,documents,index,inference,rpc,syntax,telemetry}.rs
+tests/               # mirrors src/ — integration tests only, no #[cfg(test)] in src/
+docs/                # deep-dives per module — see Docs section below
 ```
 
 Tests live exclusively under [`tests/`](./tests/) (integration tests use the crate's `pub` surface only). No `#[cfg(test)]` in [`src/`](./src/) — keep it that way.
@@ -100,7 +107,16 @@ Anything else in `initialize.params` is ignored (forward-compat).
 
 ## Docs
 
-- Dispatch / shared state: [`src/lib.rs`](./src/lib.rs) header docs.
+Module deep-dives (algorithm, public API, mermaid flowchart):
+
+- [`docs/completion.md`](./docs/completion.md) — `completion/request` end-to-end: UTF-16→UTF-8 offsets, debounce, error-code precedence.
+- [`docs/context.md`](./docs/context.md) — cursor excerpt (syntax + linewise fallback) and `repository_context` assembly, per-language import resolution.
+- [`docs/index.md`](./docs/index.md) — workspace index storage, tokenizer, BM25 ranker, extractor dispatch.
+- [`docs/inference.md`](./docs/inference.md) — FIM prompt layout, mock short-circuit, OpenAI-compatible HTTP hop.
+- [`docs/dispatch.md`](./docs/dispatch.md) — per-method handlers, the cancellation race, shutdown drain.
+
+Cross-cutting references:
+
 - JSON-RPC wire shape: [`../protocol/README.md`](../protocol/README.md) (frozen v1.2).
-- Dispatch + per-request pipeline flowcharts: [`../docs/sidecar-flow.md`](../docs/sidecar-flow.md).
-- Tree-sitter per-language node names: [`index.rs::extract`](./src/index.rs).
+- End-to-end request pipeline flowchart: [`../docs/sidecar-flow.md`](../docs/sidecar-flow.md).
+- Overall project shape: [`../docs/architecture.md`](../docs/architecture.md).

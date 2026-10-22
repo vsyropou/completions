@@ -27,63 +27,49 @@ pub struct JsonRpcError {
     pub data: Option<serde_json::Value>,
 }
 
+fn err(code: i32, message: impl Into<String>) -> JsonRpcError {
+    JsonRpcError {
+        code,
+        message: message.into(),
+        data: None,
+    }
+}
+
 impl JsonRpcError {
     /// -32700 invalid JSON on the wire.
     pub fn parse_error() -> Self {
-        Self {
-            code: -32700,
-            message: "parse error".into(),
-            data: None,
-        }
+        err(-32700, "parse error")
     }
     /// -32601 the method name isn't one we handle.
     pub fn method_not_found(m: &str) -> Self {
-        Self {
-            code: -32601,
-            message: format!("unknown method: {m}"),
-            data: None,
-        }
+        err(-32601, format!("unknown method: {m}"))
     }
     /// -32602 the params object failed validation.
     pub fn invalid_params(m: impl Into<String>) -> Self {
-        Self {
-            code: -32602,
-            message: m.into(),
-            data: None,
-        }
+        err(-32602, m)
     }
     /// -32000 the extension asked about a document we never saw open.
     pub fn unknown_document(uri: &str) -> Self {
-        Self {
-            code: -32000,
-            message: format!("unknown document: {uri}"),
-            data: None,
-        }
+        err(-32000, format!("unknown document: {uri}"))
     }
     /// -32001 client's `document_version` doesn't match our snapshot — stale request.
     /// `data` carries the sidecar's current version so the caller can resync.
     pub fn version_mismatch(want: i64, got: i64) -> Self {
-        Self {
-            code: -32001,
-            message: format!("document version mismatch: requested {want}, current {got}"),
+        JsonRpcError {
             data: Some(serde_json::json!({ "current_version": got })),
+            ..err(
+                -32001,
+                format!("document version mismatch: requested {want}, current {got}"),
+            )
         }
     }
     /// -32002 the Phoenix HTTP hop failed.
     pub fn upstream(m: impl Into<String>) -> Self {
-        Self {
-            code: -32002,
-            message: m.into(),
-            data: None,
-        }
+        err(-32002, m)
     }
     /// -32003 cancelled via `completion/cancel`.
     pub fn cancelled() -> Self {
-        Self {
-            code: -32003,
-            message: "cancelled".into(),
-            data: None,
-        }
+        err(-32003, "cancelled")
     }
     /// Serialize to a full JSON-RPC response object.
     pub fn into_response(self, id: RequestId) -> serde_json::Value {

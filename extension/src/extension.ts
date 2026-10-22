@@ -41,6 +41,13 @@ function languageFor(doc: vscode.TextDocument): string {
   return LANGUAGE_MAP[doc.languageId] ?? "unknown";
 }
 
+// UTF-16 → UTF-8 byte offset within a line. VS Code positions are UTF-16
+// code units; the wire speaks UTF-8 bytes, so the extension converts
+// before send. See protocol §4.
+function lineCharToUtf8ByteOffset(text: string, utf16Units: number): number {
+  return Buffer.byteLength(text.slice(0, utf16Units), "utf8");
+}
+
 // Files we mirror to the sidecar plus ask completions for. Any real on-disk
 // text document counts — unmapped languages go through as `"unknown"` and
 // the sidecar decides what to do (currently: prefix/suffix only, no parse).
@@ -202,10 +209,12 @@ async function provideInlineCompletionItems(
   if (!child || !isSupported(doc)) return [];
   // placeholder: real impl sends `completion/cancel` when `token` fires.
   try {
+    const lineText = doc.lineAt(position.line).text;
+    const charByte = lineCharToUtf8ByteOffset(lineText, position.character);
     const result = (await sendRequest("completion/request", {
       document_uri: doc.uri.toString(),
       document_version: doc.version,
-      position: { line: position.line, character: position.character },
+      position: { line: position.line, character: charByte },
     })) as { text: string };
     output.appendLine(`completion: ${result.text.length} chars`);
     if (token.isCancellationRequested) return [];

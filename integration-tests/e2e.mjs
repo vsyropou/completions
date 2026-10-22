@@ -112,6 +112,28 @@ try {
   assert.equal(pyCompletion.result.text, MOCK, "python completion text must equal mock");
   console.log("[4.5/5] python didOpen + completion ok");
 
+  // -- Step e2: multi-byte line — character is a UTF-8 byte offset, not UTF-16
+  const emojiUri = "file:///tmp/demo_emoji.ts";
+  notify("textDocument/didOpen", {
+    uri: emojiUri,
+    language: "typescript",
+    version: 1,
+    text: "const s = \"ab😀cd\";\n",
+  });
+  // Cursor right after the emoji (byte 17 = 13 ascii + 4 bytes of 😀).
+  // Under UTF-16 the same spot would be unit 14 — this wire value is bytes.
+  const emojiCompletion = await request("completion/request", {
+    document_uri: emojiUri,
+    document_version: 1,
+    position: { line: 0, character: 17 },
+  });
+  assert.equal(
+    emojiCompletion.result.text,
+    MOCK,
+    "emoji completion text must equal mock (sidecar treated `character` as bytes)",
+  );
+  console.log("[4.6/5] multi-byte line, byte-offset position ok");
+
   // -- Step f: shutdown, wait for exit -----------------------------------------
   await request("shutdown");
   await new Promise((res) => child.once("exit", res));

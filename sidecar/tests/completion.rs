@@ -1,8 +1,7 @@
-//! `completion/request` handler end-to-end and UTF-16 → UTF-8 offset conversion.
+//! `completion/request` handler end-to-end.
 
 use sidecar::completion::{
-    cap_prefix, cap_suffix, handle_completion_request, utf16_to_utf8_offset, Debounce, PREFIX_CAP,
-    SUFFIX_CAP,
+    cap_prefix, cap_suffix, handle_completion_request, Debounce, PREFIX_CAP, SUFFIX_CAP,
 };
 use sidecar::documents::Documents;
 use sidecar::index::Index;
@@ -70,39 +69,68 @@ async fn unknown_document_returns_32000() {
     assert_eq!(err.code, -32000);
 }
 
-#[test]
-fn utf16_basic_ascii() {
-    assert_eq!(utf16_to_utf8_offset("hello\nworld", 1, 3).unwrap(), 9);
+#[tokio::test]
+async fn byte_offset_within_line_multibyte() {
+    // Doc with an emoji on line 0. "ab😀cd" — emoji is 4 UTF-8 bytes at offset 2..6.
+    // Wire contract: character is a UTF-8 byte offset within the line.
+    let cfg = mock_config().await;
+    let docs = Documents::default();
+    docs.did_open(&serde_json::json!({
+        "uri": "file:///repo/src/emoji.ts",
+        "language": "typescript",
+        "version": 1,
+        "text": "ab😀cd\nl1"
+    }))
+    .await;
+    let mut req = open_doc();
+    req["params"] = serde_json::json!({
+        "document_uri": "file:///repo/src/emoji.ts",
+        "document_version": 1,
+        // character: 6 → right after the emoji (bytes "ab😀").
+        "position": { "line": 0, "character": 6 }
+    });
+    let out = handle_completion_request(cfg, docs, Index::default(), req, Debounce::default())
+        .await;
+    // We don't care about the completion text (mock) — only that the handler
+    // didn't return invalid_params for a mid-emoji byte offset.
+    assert!(out.is_ok(), "expected Ok(..), got: {out:?}");
 }
 
-#[test]
-fn utf16_multibyte() {
-    // "é" is 2 bytes utf8, 1 utf16 unit
-    let s = "ébc";
-    assert_eq!(utf16_to_utf8_offset(s, 0, 1).unwrap(), 2);
-    assert_eq!(utf16_to_utf8_offset(s, 0, 3).unwrap(), 4);
+#[tokio::test]
+async fn byte_offset_out_of_range_returns_invalid_params() {
+    // ASCII doc "abcd" on line 0 (4 bytes), character: 10 → out of range.
+    let cfg = mock_config().await;
+    let docs = Documents::default();
+    docs.did_open(&serde_json::json!({
+        "uri": "file:///repo/src/short.ts",
+        "language": "typescript",
+        "version": 1,
+        "text": "abcd"
+    }))
+    .await;
+    let mut req = open_doc();
+    req["params"] = serde_json::json!({
+        "document_uri": "file:///repo/src/short.ts",
+        "document_version": 1,
+        "position": { "line": 0, "character": 10 }
+    });
+    let err = handle_completion_request(cfg, docs, Index::default(), req, Debounce::default())
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, -32602);
 }
 
-#[test]
-fn utf16_surrogate_pair_boundary_before() {
-    // "😀" = U+1F600, 4 utf8 bytes, 2 utf16 units (surrogate pair)
-    let s = "a😀b";
-    // char 0 → 0 (before 'a')
-    assert_eq!(utf16_to_utf8_offset(s, 0, 0).unwrap(), 0);
-    // char 1 → 1 (after 'a', before emoji)
-    assert_eq!(utf16_to_utf8_offset(s, 0, 1).unwrap(), 1);
-    // char 2 → mid-pair (after high surrogate): protocol §4 → boundary BEFORE pair → 1
-    assert_eq!(utf16_to_utf8_offset(s, 0, 2).unwrap(), 1);
-    // char 3 → after emoji: byte 5
-    assert_eq!(utf16_to_utf8_offset(s, 0, 3).unwrap(), 5);
-    // char 4 → after 'b': byte 6
-    assert_eq!(utf16_to_utf8_offset(s, 0, 4).unwrap(), 6);
-}
-
-#[test]
-fn utf16_out_of_range_errors() {
-    assert!(utf16_to_utf8_offset("ab", 5, 0).is_err());
-    assert!(utf16_to_utf8_offset("ab", 0, 10).is_err());
+#[tokio::test]
+async fn line_out_of_range_returns_invalid_params() {
+    // Doc has 2 lines (0 and 1); ask for line 5.
+    let cfg = mock_config().await;
+    let docs = open_documents().await;
+    let mut req = open_doc();
+    req["params"]["position"] = serde_json::json!({ "line": 5, "character": 0 });
+    let err = handle_completion_request(cfg, docs, Index::default(), req, Debounce::default())
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, -32602);
 }
 
 #[test]

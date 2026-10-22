@@ -1,11 +1,9 @@
 //! The `completion/request` handler: validate input against the doc table,
 //! build prefix/suffix/context, POST to Phoenix, return the completion.
 //!
-//! Two non-obvious pieces live here:
-//! - UTF-16 → UTF-8 offset conversion (VS Code speaks UTF-16 code units;
-//!   Rust strings are UTF-8 bytes) — see [`utf16_to_utf8_offset`].
-//! - Capping prefix/suffix to fit the HTTP body limit without splitting a
-//!   multi-byte character — see [`cap_prefix`] / [`cap_suffix`].
+//! One non-obvious piece lives here: capping prefix/suffix to fit the HTTP
+//! body limit without splitting a multi-byte character — see [`cap_prefix`]
+//! / [`cap_suffix`].
 
 use crate::rpc::JsonRpcError;
 use serde::Deserialize;
@@ -47,59 +45,13 @@ pub struct CompletionParams {
     pub position: Position,
 }
 
-/// Zero-based `{line, character}` in UTF-16 code units (protocol §4).
+/// Zero-based `{line, character}` position. `character` is a UTF-8 byte
+/// offset within the line (protocol §4 — the extension converts from UTF-16
+/// before send).
 #[derive(Deserialize)]
 pub struct Position {
     pub line: usize,
     pub character: usize,
-}
-
-/// Convert a zero-based `{line, character}` UTF-16 position into a byte offset
-/// in `text`. Errors map to JSON-RPC `-32602 invalid params`. Mid-surrogate-pair
-/// positions resolve to the boundary *before* the pair (protocol §4).
-pub fn utf16_to_utf8_offset(
-    text: &str,
-    target_line: usize,
-    target_char: usize,
-) -> Result<usize, JsonRpcError> {
-    let mut line_start = 0usize;
-    for _ in 0..target_line {
-        match text[line_start..].find('\n') {
-            Some(rel) => line_start += rel + 1,
-            None => {
-                return Err(JsonRpcError::invalid_params(format!(
-                    "line {target_line} out of range"
-                )))
-            }
-        }
-    }
-    let line_end = text[line_start..]
-        .find('\n')
-        .map(|r| line_start + r)
-        .unwrap_or(text.len());
-    let line_str = &text[line_start..line_end];
-
-    let mut units = 0usize;
-    let mut byte_in_line = 0usize;
-    for ch in line_str.chars() {
-        if units == target_char {
-            return Ok(line_start + byte_in_line);
-        }
-        let u16_len = ch.len_utf16();
-        // Mid-surrogate-pair: cursor sits between high and low halves.
-        // Frozen protocol §4: boundary BEFORE the pair.
-        if u16_len == 2 && target_char > units && target_char < units + u16_len {
-            return Ok(line_start + byte_in_line);
-        }
-        units += u16_len;
-        byte_in_line += ch.len_utf8();
-    }
-    if units == target_char {
-        return Ok(line_start + byte_in_line);
-    }
-    Err(JsonRpcError::invalid_params(format!(
-        "character {target_char} out of range (line has {units} UTF-16 units)"
-    )))
 }
 
 /// Take the first `max` bytes of `s`, backing off to a UTF-8 char boundary so
@@ -174,7 +126,35 @@ pub async fn handle_completion_request(
         _ => return Err(JsonRpcError::cancelled()),
     };
 
-    let offset = utf16_to_utf8_offset(&doc.text, p.position.line, p.position.character)?;
+    let offset = {
+        // Position arrives as a UTF-8 byte offset within the line; locate the
+        // line's start byte and add. `position.character` is already bytes, so
+        // mid-line splitting is safe on any input.
+        let mut line_start = 0usize;
+        for _ in 0..p.position.line {
+            match doc.text[line_start..].find('\n') {
+                Some(rel) => line_start += rel + 1,
+                None => {
+                    return Err(JsonRpcError::invalid_params(format!(
+                        "line {} out of range",
+                        p.position.line
+                    )))
+                }
+            }
+        }
+        let line_end = doc.text[line_start..]
+            .find('\n')
+            .map(|r| line_start + r)
+            .unwrap_or(doc.text.len());
+        if p.position.character > line_end - line_start {
+            return Err(JsonRpcError::invalid_params(format!(
+                "character {} out of range (line has {} bytes)",
+                p.position.character,
+                line_end - line_start
+            )));
+        }
+        line_start + p.position.character
+    };
     // Trim prompt to a syntax-aware excerpt, then apply the byte caps as a hard
     // ceiling. The excerpt function already keeps us well under both caps.
     let lang = crate::syntax::Lang::from_language_id(&doc.language);

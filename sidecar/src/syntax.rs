@@ -6,24 +6,38 @@
 
 use tree_sitter::{Language, Parser, Tree};
 
-/// Which grammar to use. `NoParser` covers languages we intentionally
-/// don't parse (markup/config formats where tree-sitter adds nothing for
-/// the prompt we build).
+/// Which grammar to use. Variants map 1:1 to tree-sitter grammars except
+/// `NoParser`, which covers languages we intentionally don't parse
+/// (markup/config formats where tree-sitter adds nothing for the prompt we build).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lang {
+    /// .ts source files.
     TypeScript,
+    /// TypeScript + JSX (.tsx).
     Tsx,
+    /// Plain .js / .mjs / .cjs.
     JavaScript,
+    /// JavaScript + JSX (.jsx).
     Jsx,
+    /// .py.
     Python,
+    /// .rs.
     Rust,
+    /// .go.
     Go,
+    /// .java.
     Java,
+    /// .c / .h.
     C,
+    /// .cc / .cpp / .cxx / .hpp / .hh.
     Cpp,
+    /// .cs.
     CSharp,
+    /// .ex / .exs. Indexed for BM25 only — no tree-sitter extraction yet.
     Elixir,
+    /// .json — indexed for BM25 only.
     Json,
+    /// .yaml / .yml — indexed for BM25 only.
     Yaml,
     /// Languages we accept but don't parse (html, css, markdown, makefile,
     /// dockerfile, anything unrecognised). `parse` returns `None` and

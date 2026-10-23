@@ -10,8 +10,11 @@ use tokio::sync::RwLock;
 /// One open document's current state.
 #[derive(Debug, Clone)]
 pub struct Document {
+    /// Full UTF-8 source text.
     pub text: String,
+    /// Last accepted edit version. Monotonic per URI; `didChange` arrives with `+1`.
     pub version: i64,
+    /// VS Code language id (e.g. `"python"`, `"typescript"`).
     pub language: String,
 }
 
@@ -21,9 +24,19 @@ pub enum DidChangeError {
     /// Required field (`uri` / `text` / `version`) missing or wrongly-typed.
     MissingField,
     /// Incoming version was not `current + 1` for a document we track.
-    Stale { uri: String, requested: i64, current: i64 },
+    Stale {
+        /// Document URI this stale update targeted.
+        uri: String,
+        /// Version the client sent.
+        requested: i64,
+        /// Our current version for the same document.
+        current: i64,
+    },
     /// `didChange` arrived for a document the extension never opened.
-    Unopened { uri: String },
+    Unopened {
+        /// Document URI we don't know about.
+        uri: String,
+    },
 }
 
 impl std::fmt::Display for DidChangeError {

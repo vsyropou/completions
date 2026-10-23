@@ -1,9 +1,30 @@
-//! Per-language tree-sitter extractors. Reached only through the `extract`
-//! facade in `mod.rs`; nothing here is visible outside the `index` module.
+//! Per-language tree-sitter extractors. Reached only through the public
+//! `extract` facade below; nothing else here is visible outside the `index`
+//! module.
 
 use super::Symbol;
 use crate::syntax::Lang;
 use tree_sitter::{Node, Tree};
+
+/// Extract top-level symbols and import specifiers from a parse tree.
+/// `lang` picks the grammar shapes we look for; `NoParser`/`Json`/`Yaml`
+/// produce empty lists (callers still index source text for BM25).
+pub fn extract(lang: Lang, tree: &Tree, text: &str) -> (Vec<Symbol>, Vec<String>) {
+    match lang {
+        Lang::TypeScript | Lang::Tsx | Lang::JavaScript | Lang::Jsx => {
+            extract_typescript(tree, text, lang)
+        }
+        Lang::Python => extract_python(tree, text),
+        Lang::Rust => extract_rust(tree, text),
+        Lang::Go => extract_go(tree, text),
+        Lang::Java => extract_java(tree, text),
+        Lang::C | Lang::Cpp => extract_c_cpp(tree, text, lang),
+        Lang::CSharp => extract_csharp(tree, text),
+        // ponytail: elixir AST nests def/defmodule under `call` targets — v1 keeps
+        // elixir content-only (BM25 still sees it), revisit if prompts demand.
+        Lang::Elixir | Lang::Json | Lang::Yaml | Lang::NoParser => (Vec::new(), Vec::new()),
+    }
+}
 
 pub(super) fn extract_typescript(tree: &Tree, text: &str, lang: Lang) -> (Vec<Symbol>, Vec<String>) {
     let mut symbols = Vec::new();

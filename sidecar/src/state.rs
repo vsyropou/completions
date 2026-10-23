@@ -10,20 +10,31 @@ use tokio::sync::Mutex;
 /// Shared runtime configuration. Cheap to clone (Arc inside).
 #[derive(Clone)]
 pub struct Config {
+    /// The mutable config payload; lock to read or write.
     pub inner: Arc<Mutex<Inner>>,
 }
 
 /// The mutable fields behind `Config`. Lock, mutate, drop.
 pub struct Inner {
+    /// Phoenix endpoint for fire-and-forget telemetry POSTs (empty = disabled).
     pub telemetry_url: String,
+    /// Bearer token for the telemetry sink.
     pub telemetry_api_key: String,
+    /// `file:///...` URI of the workspace root; used to relativize paths.
     pub workspace_root: String,
+    /// Shared reqwest client for inference + telemetry hops.
     pub http: reqwest::Client,
+    /// Inference base URL; `Some` switches provider to `"model"`.
     pub model_url: Option<String>,
+    /// Bearer token for the inference server.
     pub model_api_key: Option<String>,
+    /// Model id sent to the inference server (default `"default"`).
     pub model: Option<String>,
+    /// FIM template string with `{prefix}`/`{suffix}` placeholders.
     pub fim_template: Option<String>,
+    /// Sampling temperature (default `0.0`).
     pub temperature: Option<f32>,
+    /// Output token cap (default `32`).
     pub max_tokens: Option<u32>,
 }
 
@@ -68,9 +79,12 @@ impl Config {
 //  - the task aborts its HTTP work if still running.
 // One Mutex covers both fields so the contains+insert pair is atomic — otherwise
 // a cancel in the gap would emit -32003 AND the success reply for one id.
+/// Cancellation/bookkeeping for in-flight completion tasks.
 #[derive(Default)]
 pub struct PendingState {
+    /// request_id → AbortHandle for tasks still running.
     pub cancel: HashMap<i64, tokio::task::AbortHandle>,
+    /// request_id → already replied. Cancel checks this to avoid double-emitting.
     pub answered: std::collections::HashSet<i64>,
     /// Join handles for in-flight completion tasks. Shutdown awaits them
     /// (best-effort, capped) so a `shutdown` frame doesn't silently swallow
@@ -78,7 +92,9 @@ pub struct PendingState {
     pub tasks: Vec<tokio::task::JoinHandle<()>>,
 }
 
+/// Cheap-clone handle shared by every handler — wraps `PendingState` in one Mutex.
 pub struct Pending {
+    /// The locked state; handlers lock briefly, mutate, drop.
     pub state: Mutex<PendingState>,
 }
 

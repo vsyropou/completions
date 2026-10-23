@@ -1,7 +1,6 @@
 #!/bin/sh
 # Generate a framed JSON-RPC session into /tmp/sidecar-in.txt.
-# Feed it to the sidecar from the shell (`< /tmp/sidecar-in.txt`) or via the
-# Zed debug config (.zed/debug.json stdio).
+# Feed it to the sidecar from the shell (`< /tmp/sidecar-in.txt`).
 # Content-Length is computed with ${#m} — edit the JSON freely.
 {
   m='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspace_root":"file:///tmp","telemetry_url":"","telemetry_api_key":""}}'

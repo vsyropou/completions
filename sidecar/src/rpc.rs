@@ -11,8 +11,11 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum RequestId {
+    /// Numeric id (the common case for this protocol).
     Num(i64),
+    /// String id (allowed by JSON-RPC 2.0 §4).
     Str(String),
+    /// Absent id — used only for `-32700 parse error` replies.
     Null,
 }
 
@@ -21,8 +24,11 @@ pub enum RequestId {
 /// (JSON-RPC 2.0 §5.1); used here only for -32001 to carry the current version.
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonRpcError {
+    /// Protocol error code (e.g. `-32001`).
     pub code: i32,
+    /// Human-readable, single-line description.
     pub message: String,
+    /// Optional structured payload (currently: `current_version` for `-32001`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<serde_json::Value>,
 }

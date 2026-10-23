@@ -11,14 +11,23 @@ const TELEMETRY_TIMEOUT_SECS: u64 = 5;
 /// Payload for one completed inference call. All strings are owned because the
 /// POST is spawned and outlives the request handler.
 pub struct Telemetry {
+    /// Unique request id (sidecar-assigned counter).
     pub request_id: String,
+    /// VS Code language id (e.g. `"python"`).
     pub language: String,
+    /// Workspace-relative forward-slash path of the completed file.
     pub file_path: String,
+    /// Full prompt body sent to the inference server.
     pub prompt: String,
+    /// Raw completion text returned.
     pub response: String,
+    /// Wall-time of the inference HTTP hop in milliseconds.
     pub latency_ms: u64,
+    /// Which path served this: `"mock"` (no `model_url`) or `"model"`.
     pub provider: &'static str,
+    /// Model id actually used (empty when mock).
     pub model: String,
+    /// Provider's `finish_reason` string, normalized in [`crate::inference`].
     pub finish_reason: String,
 }
 

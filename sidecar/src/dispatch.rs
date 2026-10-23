@@ -107,6 +107,8 @@ async fn handle_initialize(
     Ok(serde_json::json!({}))
 }
 
+/// `initialize` JSON-RPC handler: parse params into `Config`, spawn background
+/// workspace indexing, reply with `{}` or an error.
 pub async fn on_initialize(cfg: &Config, val: &serde_json::Value, index: &Index, id: RequestId, writer: &Writer) {
     let resp = match handle_initialize(cfg, val, index).await {
         Ok(v) => rpc::success_response(id, v),
@@ -115,6 +117,8 @@ pub async fn on_initialize(cfg: &Config, val: &serde_json::Value, index: &Index,
     write(writer, resp).await;
 }
 
+/// `shutdown` JSON-RPC handler: wait up to 5 s for in-flight completion
+/// tasks to finish naturally, ack with `null`, exit the frame loop.
 pub async fn on_shutdown(pending: &Pending, id: RequestId, writer: &Writer) {
     // Drain in-flight completion tasks so a late `shutdown` doesn't
     // silently eat a request the user is still waiting on. Bounded —
@@ -137,6 +141,10 @@ pub async fn on_shutdown(pending: &Pending, id: RequestId, writer: &Writer) {
     tracing::info!("shutdown");
 }
 
+/// `completion/request` JSON-RPC handler: spawn the completion work as a
+/// cancellable tokio task; the task checks `answered` before writing so a
+/// racing `completion/cancel` can't double-emit a response.
+#[allow(clippy::too_many_arguments)] // ponytail: dispatch-shaped; a `Ctx` struct is the upgrade if a 9th arg ever appears
 pub async fn on_completion_request(
     cfg: Config,
     docs: Documents,
@@ -181,6 +189,9 @@ pub async fn on_completion_request(
     pnd.state.lock().await.tasks.push(task);
 }
 
+/// `completion/cancel` notification: claim the answer slot, abort the task
+/// if it's still in flight, and emit `-32003` unless the response already
+/// went out.
 pub async fn on_cancel(pending: &Pending, val: &serde_json::Value, writer: &Writer) {
     if let Some(rid) = val
         .get("params")
@@ -202,6 +213,8 @@ pub async fn on_cancel(pending: &Pending, val: &serde_json::Value, writer: &Writ
     }
 }
 
+/// `textDocument/didOpen` notification: insert into `Documents` and refresh
+/// the workspace index for this file.
 pub async fn on_did_open(documents: &Documents, index: &Index, config: &Config, val: &serde_json::Value) {
     documents
         .did_open(val.get("params").unwrap_or(&serde_json::Value::Null))
@@ -209,6 +222,9 @@ pub async fn on_did_open(documents: &Documents, index: &Index, config: &Config, 
     refresh_index_for_doc(index, config, val.get("params")).await;
 }
 
+/// `textDocument/didChange` notification: full-replacement update at version
+/// = current+1; a stale version is logged, swallowed, and does **not** refresh
+/// the index — completions against the stale doc will `-32001`.
 pub async fn on_did_change(documents: &Documents, index: &Index, config: &Config, val: &serde_json::Value) {
     if let Err(e) = documents
         .did_change(val.get("params").unwrap_or(&serde_json::Value::Null))
@@ -222,16 +238,19 @@ pub async fn on_did_change(documents: &Documents, index: &Index, config: &Config
     }
 }
 
+/// `textDocument/didClose` notification: drop the document.
 pub async fn on_did_close(documents: &Documents, val: &serde_json::Value) {
     documents
         .did_close(val.get("params").unwrap_or(&serde_json::Value::Null))
         .await;
 }
 
+/// Fallback for an unknown method: `-32601 method_not_found`.
 pub async fn on_unknown(writer: &Writer, id: RequestId, method: &str) {
     write_err(writer, id, JsonRpcError::method_not_found(method)).await;
 }
 
+/// The incoming frame wasn't parseable JSON: `-32700 parse_error` with id null.
 pub async fn on_parse_error(writer: &Writer) {
     write_err(writer, RequestId::Null, JsonRpcError::parse_error()).await;
 }

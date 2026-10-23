@@ -3,15 +3,10 @@
 //!
 //! To *change* what gets picked, edit [`build_repository_context`]. To change
 //! the *ranking* heuristic (which files are even considered), see
-//! `crate::index::Index` and the way `resolve.rs` maps `import ... from "./y"`.
+//! `crate::index::Index` — imports are matched by file-stem, not
+//! per-language path resolution.
 
 mod fmt;
-mod resolve;
-
-pub use resolve::{
-    resolve_c_include, resolve_go_import, resolve_import, resolve_import_for,
-    resolve_java_import, resolve_python_import, resolve_rust_import,
-};
 
 use crate::index::Index;
 use fmt::fmt_symbol;
@@ -20,161 +15,6 @@ use tree_sitter::{Node, Tree};
 
 /// Byte cap on the final `repository_context` string. Keeps prompt size sane.
 pub const REPO_CTX_CAP: usize = 2000;
-
-/// Bleed-off token-per-byte heuristic from Zed's `cursor_excerpt.rs`. Used only to
-/// size the cursor excerpt: ~3 bytes per token matches editor text well enough.
-pub const BYTES_PER_TOKEN_GUESS: usize = 3;
-
-/// Cursor-centered slice of the current buffer, returned with cursor position
-/// projected into it. Byte offsets are into the *source* text.
-pub struct Excerpt {
-    pub start_byte: usize,
-    pub end_byte: usize,
-    pub cursor_offset_in_excerpt: usize,
-}
-
-/// Smart cursor excerpt.
-///
-/// Tries syntax-aware expansion first: walk the ancestor chain at `cursor_offset`,
-/// pick the largest ancestor whose byte range fits `token_budget × 3` bytes.
-/// Falls back to linewise symmetric expansion
-///
-/// `token_budget` is a *token* budget; byte-cap = `token_budget × 3`.
-pub fn compute_cursor_excerpt(
-    text: &str,
-    tree: Option<&Tree>,
-    cursor_offset: usize,
-    token_budget: usize,
-) -> Excerpt {
-    let byte_budget = token_budget.saturating_mul(BYTES_PER_TOKEN_GUESS);
-    let cursor = cursor_offset.min(text.len());
-    if text.is_empty() || byte_budget == 0 {
-        return Excerpt {
-            start_byte: 0,
-            end_byte: text.len(),
-            cursor_offset_in_excerpt: cursor,
-        };
-    }
-    if text.len() <= byte_budget {
-        return Excerpt {
-            start_byte: 0,
-            end_byte: text.len(),
-            cursor_offset_in_excerpt: cursor,
-        };
-    }
-    if let Some(t) = tree {
-        if let Some(range) = syntax_expansion(text, t, cursor, byte_budget) {
-            return Excerpt {
-                start_byte: range.0,
-                end_byte: range.1,
-                cursor_offset_in_excerpt: cursor - range.0,
-            };
-        }
-    }
-    let (s, e) = linewise_symmetric_expansion(text, cursor, byte_budget);
-    Excerpt {
-        start_byte: s,
-        end_byte: e,
-        cursor_offset_in_excerpt: cursor - s,
-    }
-}
-
-/// Find the largest syntax ancestor of `cursor` whose byte range fits the budget.
-/// Returns `(start, end)` snapped to line boundaries so excerpts read like code,
-/// not fragments. `None` if even the cursor's innermost block overflows the budget.
-fn syntax_expansion(
-    text: &str,
-    tree: &Tree,
-    cursor: usize,
-    byte_budget: usize,
-) -> Option<(usize, usize)> {
-    let probe = cursor.saturating_sub(1).min(text.len());
-    let mut node = tree
-        .root_node()
-        .descendant_for_byte_range(probe, probe)?;
-    let mut best: Option<(usize, usize)> = None;
-    loop {
-        let s = node.start_byte();
-        let e = node.end_byte().min(text.len());
-        // Snap to line boundaries for a cleaner prompt. Clamping to the line
-        // containing the node's first/last byte means we never widen past what
-        // fits, only past what the AST reports (see also Zed's `compute_syntax_ranges`).
-        let ls = text[..s].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let le = text[e..]
-            .find('\n')
-            .map(|i| e + i + 1)
-            .unwrap_or(text.len());
-        if le.saturating_sub(ls) > byte_budget {
-            break;
-        }
-        best = Some((ls, le));
-        node = node.parent()?;
-    }
-    best
-}
-
-/// Alternating down/up line expansion. Charges each line `max(1, bytes/3)` tokens
-/// against a token budget of `byte_budget / 3`. Deterministic, O(lines_added).
-pub fn linewise_symmetric_expansion(text: &str, cursor: usize, byte_budget: usize) -> (usize, usize) {
-    // Cursor may sit mid-line: treat "line at cursor" as our seed.
-    let cur_line_start = text[..cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let cur_line_end = text[cursor..]
-        .find('\n')
-        .map(|i| cursor + i + 1)
-        .unwrap_or(text.len());
-
-    fn line_cost(line: &str) -> usize {
-        // Min 1 token per line so empty lines aren't free-forever.
-        (line.len() / BYTES_PER_TOKEN_GUESS).max(1)
-    }
-
-    let token_budget = byte_budget / BYTES_PER_TOKEN_GUESS;
-    let mut start = cur_line_start;
-    let mut end = cur_line_end;
-    let mut spent = line_cost(&text[cur_line_start..cur_line_end]);
-    if spent > token_budget {
-        return (start, end);
-    }
-    loop {
-        // Try expanding down first.
-        let next_down = if end < text.len() {
-            let le = text[end..]
-                .find('\n')
-                .map(|i| end + i + 1)
-                .unwrap_or(text.len());
-            Some((end, le))
-        } else {
-            None
-        };
-        let mut advanced = false;
-        if let Some((ds, de)) = next_down {
-            let c = line_cost(&text[ds..de]);
-            if spent + c <= token_budget {
-                end = de;
-                spent += c;
-                advanced = true;
-            }
-        }
-        // Then up.
-        if start > 0 {
-            let prev_end = start.saturating_sub(1); // one-past-end of prev line
-            let prev_start = text[..prev_end].rfind('\n').map(|i| i + 1).unwrap_or(0);
-            let c = line_cost(&text[prev_start..start]);
-            if spent + c <= token_budget {
-                start = prev_start;
-                spent += c;
-                advanced = true;
-            }
-        }
-        if !advanced {
-            break;
-        }
-        if spent >= token_budget {
-            break;
-        }
-    }
-    (start, end)
-}
 
 /// Pull identifier-ish tokens from the lines surrounding the cursor (±3).
 /// Result feeds BM25 ranking. Deduped, capped at 12.
@@ -235,7 +75,9 @@ pub fn identifiers_near_cursor(text: &str, cursor_offset: usize, radius_lines: u
 /// Innermost enclosing function and class names at a cursor position. Either
 /// may be `None` if the cursor sits at top level.
 pub struct Enclosing {
+    /// Name of the innermost function surrounding the cursor.
     pub function: Option<String>,
+    /// Name of the innermost class-like node surrounding the cursor.
     pub class: Option<String>,
 }
 
@@ -300,6 +142,26 @@ fn name_of(node: &Node, text: &str) -> Option<String> {
 }
 
 
+/// Build the `repository_context` string for one file. Pulls the parse via
+/// [`crate::syntax`] and the workspace root from `cfg`; returns `""` when
+/// tree-sitter has no grammar for the file's language.
+pub async fn repository_context(
+    cfg: &crate::Config,
+    index: &Index,
+    doc: &crate::documents::Document,
+    uri: &str,
+    offset: usize,
+) -> String {
+    let lang = crate::syntax::Lang::from_language_id(&doc.language);
+    let Some(tree) = crate::syntax::parse(lang, &doc.text) else {
+        return String::new();
+    };
+    let workspace_root = cfg.inner.lock().await.workspace_root.clone();
+    let file_path = crate::repo_relative_str(&workspace_root, uri);
+    let query_terms = identifiers_near_cursor(&doc.text, offset, 3);
+    build_repository_context_with_query(index, &file_path, &tree, &doc.text, offset, &query_terms).await
+}
+
 /// Build the repository_context string for the HTTP payload.
 pub async fn build_repository_context(
     index: &Index,
@@ -350,19 +212,26 @@ pub async fn build_repository_context_with_query(
         lines.push(fmt_symbol(s, current_file));
     }
 
-    // (b) symbols from files that this file imports. Read from the index — its
-    // per-language extractor already handles TS `import`, Python `import/from`,
-    // Rust `use`, Go `import`, Java `import`, C/Cpp `#include`, C# `using`.
+    // (b) symbols from files that this file imports. Specs are matched by
+    // *file stem* against the index — replaces per-language path resolution.
+    // May over-match (two `utils.ts` files both yield symbols); the cap absorbs
+    // the noise and BM25 further denoises. See index::Index::symbols_for_stem.
     let specs = index.imports_of(&current_path).await;
     let mut imported_files: std::collections::HashSet<String> = std::collections::HashSet::new();
     for spec in specs.iter() {
-        if let Some(resolved) = resolve_import(index, current_file, spec).await {
-            let symbols = index.symbols_for(&resolved).await;
-            let rel_str = resolved.to_string_lossy().replace('\\', "/");
+        // Take the last path-ish segment of the spec as the stem. Handles
+        // "./utils/logger" → "logger", "foo.bar" → "bar", "crate::a::B" → "B".
+        let stem = spec
+            .rsplit(['/', '.', ':', '\\'])
+            .next()
+            .unwrap_or(spec.as_str());
+        if stem.is_empty() {
+            continue;
+        }
+        for (path, s) in index.symbols_for_stem(stem).await {
+            let rel_str = path.to_string_lossy().replace('\\', "/");
             imported_files.insert(rel_str.clone());
-            for s in symbols.iter() {
-                lines.push(fmt_symbol(s, &rel_str));
-            }
+            lines.push(fmt_symbol(&s, &rel_str));
         }
     }
 

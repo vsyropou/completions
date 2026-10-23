@@ -38,6 +38,20 @@ clean:
 	rm -f extension/completion-*.vsix
 	rm -f extension/bin/sidecar
 
+# Sidecar lint — ruff-style. `lint` reports only; `lint-fix` applies clippy
+# suggestions + cargo fmt in-place (≈ `ruff check --fix`).
+.PHONY: sidecar-lint
+sidecar-lint:
+	cargo clippy --manifest-path sidecar/Cargo.toml --all-targets --all-features \
+		-- -D warnings -W missing_docs
+
+.PHONY: sidecar-lint-fix
+sidecar-lint-fix:
+	cargo fmt --manifest-path sidecar/Cargo.toml
+	cargo clippy --manifest-path sidecar/Cargo.toml --all-targets --all-features \
+		--fix --allow-dirty --allow-staged \
+		-- -D warnings -W missing_docs
+
 .PHONY: model
 model:
 	@command -v llama-server >/dev/null || { echo "llama-server not found. brew install llama.cpp"; exit 1; }

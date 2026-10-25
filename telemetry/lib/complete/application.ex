@@ -2,7 +2,7 @@ defmodule Complete.Application do
   @moduledoc """
   OTP application entry point. Supervision tree (one-for-one):
 
-    * `Complete.TelemetryStore` — in-memory telemetry event buffer.
+    * `Complete.Repo` — Ecto Postgres repo for persisted telemetry.
     * `CompleteWeb.Endpoint` — the Phoenix HTTP endpoint serving
       `/api/v1/*`.
   """
@@ -11,7 +11,7 @@ defmodule Complete.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      Complete.TelemetryStore,
+      Complete.Repo,
       CompleteWeb.Endpoint
     ]
 

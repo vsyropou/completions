@@ -22,3 +22,6 @@ extension/bin/sidecar
 
 CLAUDE.md
 AGENT.md
+
+# Scratch dirs
+/data/

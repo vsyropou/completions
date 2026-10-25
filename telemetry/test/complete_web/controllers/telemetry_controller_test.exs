@@ -1,7 +1,7 @@
 defmodule CompleteWeb.TelemetryControllerTest do
   use CompleteWeb.ConnCase, async: false
 
-  alias Complete.TelemetryStore
+  alias Complete.Telemetry
 
   @valid %{
     "request_id" => "r1",
@@ -12,22 +12,24 @@ defmodule CompleteWeb.TelemetryControllerTest do
     "latency_ms" => 42,
     "provider" => "mock",
     "model" => "m1",
-    "finish_reason" => "stop"
+    "finish_reason" => "stop",
+    "outcome" => "served"
   }
 
   setup do
-    Agent.update(TelemetryStore, fn _ -> [] end)
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Complete.Repo, shared: true)
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
     :ok
   end
 
   test "401 without bearer", %{conn: conn} do
-    conn = post(conn, "/api/v1/completions", @valid)
+    conn = post(conn, "/api/v1/events", @valid)
     assert conn.status == 401
     assert json_response(conn, 401)["error"]["code"] == "unauthorized"
   end
 
   test "401 on GETs without bearer", %{conn: conn} do
-    assert get(conn, "/api/v1/completions").status == 401
+    assert get(conn, "/api/v1/events").status == 401
     assert get(conn, "/api/v1/stats").status == 401
   end
 
@@ -36,7 +38,7 @@ defmodule CompleteWeb.TelemetryControllerTest do
     assert conn.status == 202
     assert json_response(conn, 202) == %{}
 
-    [ev] = TelemetryStore.recent(1)
+    [ev] = Telemetry.recent_events(1)
     assert ev.request_id == "r1"
     assert ev.latency_ms == 42
   end
@@ -58,22 +60,34 @@ defmodule CompleteWeb.TelemetryControllerTest do
     assert conn.status == 400
   end
 
+  test "400 on bad outcome value", %{conn: conn} do
+    conn = authed_post(conn, Map.put(@valid, "outcome", "bogus"))
+    assert conn.status == 400
+  end
+
+  test "400 on missing outcome", %{conn: conn} do
+    conn = authed_post(conn, Map.delete(@valid, "outcome"))
+    assert conn.status == 400
+  end
+
   test "GET index returns newest 50 events", %{conn: conn} do
     for i <- 1..60 do
-      TelemetryStore.add(%{
-        request_id: "req-#{i}",
-        language: "ts",
-        file_path: "f",
-        prompt: "p",
-        response: "r",
-        latency_ms: i,
-        provider: "m",
-        model: "m",
-        finish_reason: "stop"
-      })
+      {:ok, _} =
+        Telemetry.log_event(%{
+          request_id: "req-#{i}",
+          language: "ts",
+          file_path: "f",
+          prompt: "p",
+          response: "r",
+          latency_ms: i,
+          provider: "m",
+          model: "m",
+          finish_reason: "stop",
+          outcome: "served"
+        })
     end
 
-    conn = conn |> authed() |> get("/api/v1/completions")
+    conn = conn |> authed() |> get("/api/v1/events")
     assert conn.status == 200
     %{"events" => events} = json_response(conn, 200)
     assert length(events) == 50
@@ -81,29 +95,33 @@ defmodule CompleteWeb.TelemetryControllerTest do
   end
 
   test "GET stats aggregates", %{conn: conn} do
-    TelemetryStore.add(%{
-      request_id: "a",
-      language: "typescript",
-      file_path: "f",
-      prompt: "p",
-      response: "r",
-      latency_ms: 10,
-      provider: "m",
-      model: "m",
-      finish_reason: "stop"
-    })
+    {:ok, _} =
+      Telemetry.log_event(%{
+        request_id: "a",
+        language: "typescript",
+        file_path: "f",
+        prompt: "p",
+        response: "r",
+        latency_ms: 10,
+        provider: "m",
+        model: "m",
+        finish_reason: "stop",
+        outcome: "served"
+      })
 
-    TelemetryStore.add(%{
-      request_id: "b",
-      language: "typescript",
-      file_path: "f",
-      prompt: "p",
-      response: "r",
-      latency_ms: 30,
-      provider: "m",
-      model: "m",
-      finish_reason: "stop"
-    })
+    {:ok, _} =
+      Telemetry.log_event(%{
+        request_id: "b",
+        language: "typescript",
+        file_path: "f",
+        prompt: "p",
+        response: "r",
+        latency_ms: 30,
+        provider: "m",
+        model: "m",
+        finish_reason: "stop",
+        outcome: "served"
+      })
 
     conn = conn |> authed() |> get("/api/v1/stats")
     assert conn.status == 200
@@ -111,6 +129,8 @@ defmodule CompleteWeb.TelemetryControllerTest do
     assert body["count"] == 2
     assert body["avg_latency_ms"] == 20.0
     assert body["by_language"] == %{"typescript" => 2}
+    assert body["requests_non_cancelled"] == 2
+    assert body["acceptance_rate"] == 0.0
   end
 
   defp authed(conn) do
@@ -121,6 +141,6 @@ defmodule CompleteWeb.TelemetryControllerTest do
     conn
     |> authed()
     |> put_req_header("content-type", "application/json")
-    |> post("/api/v1/completions", Jason.encode!(body))
+    |> post("/api/v1/events", Jason.encode!(body))
   end
 end

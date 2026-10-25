@@ -27,3 +27,11 @@ ignore = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["net"] }
+
+# Shrink the shipped binary that rides inside the .vsix.
+[profile.release]
+strip = true            # remove symbol tables (Rust 1.77+ ships strip here)
+lto = true              # whole-program optimization; biggest single win
+codegen-units = 1       # feed the linker one TU for max cross-inlining
+panic = "abort"         # drop the unwinding runtime
+opt-level = "z"         # favor code size over speed

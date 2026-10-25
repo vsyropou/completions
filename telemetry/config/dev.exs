@@ -1,5 +1,12 @@
 import Config
 
+config :complete, Complete.Repo,
+  database: "telemetry",
+  username: "complete",
+  password: "complete",
+  hostname: "localhost",
+  pool_size: 10
+
 config :complete, CompleteWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4000],
   check_origin: false,

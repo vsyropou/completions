@@ -9,15 +9,16 @@ Three processes, two hops, one frozen contract. The frozen wire shapes live in [
 │  extension/src/              │         │  sidecar/src/            │         │  telemetry/lib/        │
 │                              │         │                          │         │                        │
 │  ┌────────────────────────┐  │ stdin/  │  ┌────────────────────┐  │         │  ┌──────────────────┐  │
-│  │ extension.ts           │  │ stdout  │  │ rpc.rs    (JSON-   │  │         │  │ TelemetryStore   │  │
-│  │  • spawn sidecar       │─▶│headers  │─▶│           RPC)     │─│────────▶│  │  (Agent, 500-cap │  │
-│  │  • inline completion   │  │ +frame  │  │ documents.rs       │  │ teleme- │  │   in-memory)     │  │
-│  │    provider            │◀─│         │◀─│ context.rs (excerpt│◀│ │ POST   │  └──────────────────┘  │
-│  │  • document sync       │  │         │  │ index.rs  (BM25)   │  │ async   │          │             │
-│  └────────────────────────┘  │         │  │ syntax.rs (ts)     │  │         │          │ read API    │
-│                              │         │  │ inference.rs (FIM) │  │         │          ▼             │
-│  Output channel:             │         │  │ telemetry.rs       │  │         │  GET /api/v1/*         │
-│   "Completion Sidecar"       │         │  └────────────────────┘  │         └────────────────────────┘
+│  │ extension.ts           │  │ stdout  │  │ rpc.rs    (JSON-   │  │         │  │ Complete.Repo    │  │
+│  │  • spawn sidecar       │─▶│headers  │─▶│           RPC)     │─│────────▶│  │  (Postgres,      │  │
+│  │  • inline completion   │  │ +frame  │  │ documents.rs       │  │ teleme- │  │   telemetry_     │  │
+│  │    provider            │◀─│         │◀─│ context.rs (excerpt│◀│ │ POST   │  │   events)        │  │
+│  │  • document sync       │  │         │  │ index.rs  (BM25)   │  │ async   │  └────────┬─────────┘  │
+│  │  • telemetry.ts        │──┼─────────┼──┼─▶telemetry.rs       │  │         │           │ LiveView    │
+│  └────────────────────────┘  │         │  │ syntax.rs (ts)     │  │         │           ▼ UI (no auth)│
+│                              │         │  │ inference.rs (FIM) │  │         │  GET /events /stats     │
+│  Output channel:             │         │  └────────────────────┘  │         │  GET /api/v1/* (bearer) │
+│   "Completion Sidecar"       │         └────────────┬─────────────┘         └────────────────────────┘
 └──────────────────────────────┘         └────────────┬─────────────┘
                                                       │
                                                       │ HTTP
@@ -37,7 +38,7 @@ LSP-style framing: `Content-Length: N\r\n\r\n<json>`. stdout is protocol-only; l
 Requests (response expected):
 
 - `initialize` — handshake; sends `workspace_root`, `telemetry_url`, `telemetry_api_key`, `measure_latency`, plus inference config `model_url` / `model_api_key` / `model` / `fim_template` / `temperature` / `max_tokens`. Returns `capabilities`.
-- `completion/request` — ask for a completion. Params: `document_uri`, `document_version`, `position {line, character}` (UTF-16, zero-based). Returns `{text, document_version}` or a JSON-RPC error (`-32000` unknown document, `-32001` stale version, `-32002` upstream error, `-32003` cancelled).
+- `completion/request` — ask for a completion. Params: `document_uri`, `document_version`, `position {line, character}` (UTF-16, zero-based). Returns `{text, document_version, request_id}` (v1.3+; the extension uses `request_id` to correlate the acceptance event it POSTs directly to the telemetry sink) or a JSON-RPC error (`-32000` unknown document, `-32001` stale version, `-32002` upstream error, `-32003` cancelled).
 - `shutdown` — graceful exit; sidecar responds then exits 0.
 
 Notifications (no response):
@@ -63,17 +64,19 @@ Response (200): OpenAI-compatible `{"choices":[{"text":…, "finish_reason":…}
 
 When `model_url` is empty, the sidecar's mock path returns a static deterministic string (the `// hello from mock backend` marker).
 
-## Hop 3 — Sidecar ↔ Phoenix (telemetry, asynchronous)
+## Hop 3 — Sidecar + Extension ↔ Phoenix (telemetry, asynchronous)
 
-Fire-and-forget, never blocks the editor:
+Fire-and-forget from BOTH ends, correlated by `request_id`:
 
 ```
-POST {telemetry_url}/api/v1/completions
+POST {telemetry_url}/api/v1/events
 Content-Type: application/json
 Authorization: Bearer {telemetry_api_key}
 ```
 
-Body: `{request_id, language, file_path, prompt, response, latency_ms, provider, model, finish_reason}`. Phoenix stores to an in-memory Agent (500-event cap) and replies `202` — the sidecar does not await.
+Body: `{request_id, language, file_path, prompt, response, latency_ms, provider, model, finish_reason, outcome}` — one event per stage of a request's life. The **sidecar** emits `requested` (pre-inference), `served` (success), `superseded` (debounce loser), `error` (inference failed). The **extension** emits `accepted` (user inserted the ghost text via tab — VS Code runs the InlineCompletionItem's `command`) and `cancelled` (CancellationToken fired; carries an extension-local `req-ext-N` id since the sidecar's id hasn't arrived yet). Phoenix persists each row in Postgres (`telemetry_events`, docker-compose `postgres:18`) and replies `202`.
+
+Read side: `GET /api/v1/events` + `GET /api/v1/stats` (Bearer) and an unauthenticated LiveView UI at `/events` (raw searchable log, per-request reconciliation) and `/stats` (non-cancelled count + acceptance % cards + by-language table).
 
 ## Ground rules
 

@@ -83,22 +83,40 @@ pub async fn handle_completion_request(
             doc.version,
         ));
     }
-    let doc = debounce_recheck(&documents, &p, debounce).await?;
-    let offset = byte_offset(&doc.text, &p.position)?;
 
-    let repo = Repo::build(&cfg, &index, &doc, &p.document_uri, offset).await;
-
-    let workspace_root = cfg.inner.lock().await.workspace_root.clone();
+    // Mint the request id up front: the extension needs it in the response to
+    // correlate acceptance, and every telemetry event of this request's life
+    // (requested → served/superseded/error) shares it.
     static NEXT_REQ_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     let request_id = format!(
         "req-{}",
         NEXT_REQ_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     );
+
+    let doc = match debounce_recheck(&documents, &p, debounce).await {
+        Ok(d) => d,
+        Err(e) => {
+            if e.code == -32003 {
+                fire_outcome(&cfg, &p, &documents, &request_id, "superseded").await;
+            }
+            return Err(e);
+        }
+    };
+
+    // Record the request before the server hop so "total requests excluding
+    // canceled" is computable from telemetry alone.
+    fire_outcome(&cfg, &p, &documents, &request_id, "requested").await;
+
+    let offset = byte_offset(&doc.text, &p.position)?;
+
+    let repo = Repo::build(&cfg, &index, &doc, &p.document_uri, offset).await;
+
+    let workspace_root = cfg.inner.lock().await.workspace_root.clone();
     let language = doc.language.clone();
     let file_path = crate::repo_relative_str(&workspace_root, &p.document_uri);
 
     let http_start = std::time::Instant::now();
-    let (prompt, completion, finish_reason, model) = crate::inference::complete(
+    let (prompt, completion, finish_reason, model) = match crate::inference::complete(
         &cfg,
         &doc.language,
         &file_path,
@@ -107,7 +125,14 @@ pub async fn handle_completion_request(
         &repo.context,
         &request_id,
     )
-    .await?;
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            fire_outcome(&cfg, &p, &documents, &request_id, "error").await;
+            return Err(e);
+        }
+    };
     let http_ms = http_start.elapsed().as_millis() as u64;
 
     // Editor got its answer; telemetry fans out in the background and is
@@ -120,7 +145,7 @@ pub async fn handle_completion_request(
     crate::telemetry::fire(
         cfg.clone(),
         crate::telemetry::Telemetry {
-            request_id,
+            request_id: request_id.clone(),
             language,
             file_path,
             prompt,
@@ -129,12 +154,14 @@ pub async fn handle_completion_request(
             provider,
             model,
             finish_reason,
+            outcome: "served",
         },
     );
 
     Ok(json!({
         "text": completion,
         "document_version": doc.version,
+        "request_id": request_id,
     }))
 }
 
@@ -165,6 +192,41 @@ async fn debounce_recheck(
         Some(d) if d.version == p.document_version => Ok(d),
         _ => Err(JsonRpcError::cancelled()),
     }
+}
+
+/// Fire a telemetry event with empty body slots for outcomes that never
+/// reached inference (`requested`, `superseded`, `error`). Needs the current
+/// document for `language`; if the doc disappeared mid-flight, language
+/// degrades to `"unknown"` — the event still counts toward the rate metrics.
+async fn fire_outcome(
+    cfg: &crate::Config,
+    p: &CompletionParams,
+    documents: &crate::documents::Documents,
+    request_id: &str,
+    outcome: &'static str,
+) {
+    let doc = documents.get(&p.document_uri).await;
+    let workspace_root = cfg.inner.lock().await.workspace_root.clone();
+    let provider = if cfg.inner.lock().await.model_url.is_some() {
+        "model"
+    } else {
+        "mock"
+    };
+    crate::telemetry::fire(
+        cfg.clone(),
+        crate::telemetry::Telemetry {
+            request_id: request_id.to_owned(),
+            language: doc.map(|d| d.language).unwrap_or_else(|| "unknown".into()),
+            file_path: crate::repo_relative_str(&workspace_root, &p.document_uri),
+            prompt: String::new(),
+            response: String::new(),
+            latency_ms: 0,
+            provider,
+            model: String::new(),
+            finish_reason: String::new(),
+            outcome,
+        },
+    );
 }
 
 /// Flatten `{line, character}` into a byte offset within `text`.

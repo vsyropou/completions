@@ -112,12 +112,14 @@ inference::complete(cfg, lang, file, prefix, suffix, repo_ctx, request_id)
       │
       ▼
 telemetry::fire   (tokio::spawn, detached)                  [telemetry.rs]
-      │  POST {telemetry_url}/api/v1/completions
+      │  POST {telemetry_url}/api/v1/events
       │  body: {request_id, language, file_path, prompt, response, latency_ms,
-      │         provider, model, finish_reason}
+      │         provider, model, finish_reason, outcome}
+      │  outcome here: "served" (a "requested" event fired pre-inference;
+      │  debounce-loss path fires "superseded"; inference-Err path fires "error")
       │  errors → tracing::debug, dropped silently
       ▼
-response = {text, document_version}
+response = {text, document_version, request_id}   (request_id added in v1.3)
       │
       ▼
 locked stdout write (Content-Length frame)

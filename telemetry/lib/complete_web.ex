@@ -7,6 +7,7 @@ defmodule CompleteWeb do
 
       import Plug.Conn
       import Phoenix.Controller
+      import Phoenix.LiveView.Router
     end
   end
 
@@ -15,6 +16,20 @@ defmodule CompleteWeb do
       use Phoenix.Controller, formats: [:json]
 
       import Plug.Conn
+    end
+  end
+
+  def live_view do
+    quote do
+      use Phoenix.LiveView, layout: false
+
+      unquote(html_helpers())
+    end
+  end
+
+  defp html_helpers do
+    quote do
+      import Phoenix.HTML
     end
   end
 

@@ -15,8 +15,16 @@ defmodule CompleteWeb.Endpoint do
   """
   use Phoenix.Endpoint, otp_app: :complete
 
+  socket "/live", Phoenix.LiveView.Socket
+
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
+
+  # LiveView CSRF token comes from session.
+  plug Plug.Session,
+    store: :cookie,
+    key: "_complete_key",
+    signing_salt: "ZjQ0mRhb"
 
   # 256 KB body cap per protocol v1.0 §3.1. Plug.Parsers raises
   # Plug.Parsers.RequestTooLargeError (status 413) and ParseError (400)

@@ -1,6 +1,17 @@
 # code-completion
 
-Low-latency multiline code completion in VS Code. Three processes, split roles:
+A learning exercise to `"Bring Your Own Model"` code completion.
+
+This repo is for you if:
+
+- You got addicted to cursor's ai completion harness capabilities.
+- You really appriciate zed's `"bring your own model approach"` to their ide.
+- You like to host models yourself.
+- You want ai code completions when no internet connection is available.
+- You value the `Retrieve` part in RAG much more than the Generation.
+- You like to learn while building and breaking stuff.
+
+Repo layout:
 
 ```
 VS Code extension (TS) ──JSON-RPC 2.0/stdio──▶ Rust sidecar ──▶ Inference server
@@ -10,16 +21,17 @@ VS Code extension (TS) ──JSON-RPC 2.0/stdio──▶ Rust sidecar ──▶ 
 
 The Rust sidecar does the smart work — prompt assembly (FIM), repo context, cursor excerpt, BM25 ranking, and the HTTP call to the inference server. Phoenix is no longer in the response path; it receives fire-and-forget telemetry events and exposes them via a small read API.
 
-Top-level layout:
-
 ├─ [`extension/`](./extension/) — VS Code extension in TypeScript  
 ├─ [`sidecar/`](./sidecar/) — Rust per-window process  
 ├─ [`telemetry/`](./telemetry/) — Phoenix backend (telemetry store + read endpoints)  
-├─ [`protocol/README.md`](./protocol/README.md) — frozen v1.2 contract for extension↔sidecar  
-├─ [`docs/architecture.md`](./docs/)
-└─ [`integration-tests/e2e.mjs`](./integration-tests/e2e.mjs) — smoke-test that drives the full pipeline
+├─ [`protocol/README.md`](./protocol/README.md) — frozen v1.3 contract for extension↔sidecar  
+├─ docs - [`arhitecture`](./docs/architecture.md) and [`index`](./docs/architecture.md) documentation
 
 ## Install and Run
+
+```sh
+npm install -g @vscode/vsce   # or: brew install vsce
+```
 
 The top-level [`Makefile`](./Makefile) builds the release sidecar, compiles the extension, stages everything, and installs the `.vsix` into VS Code:
 
@@ -73,18 +85,19 @@ make model HF_REPO=bartowski/Qwen2.5-Coder-7B-Instruct-GGUF \
            MODEL_PORT=8001
 ```
 
-## Phoenix telemetry read API
+## Phoenix telemetry
 
-- `GET /api/v1/completions` — 50 newest events (Bearer auth)
-- `GET /api/v1/completions/{id}` — (not implemented; use the list endpoint)
-- `GET /api/v1/stats` — `{count, avg_latency_ms, by_language, by_provider}`
+- `POST /api/v1/events` — sidecar and extension emit outcome-keyed events (`requested`/`served`/`superseded`/`accepted`/`cancelled`/`error`), correlated by `request_id`
+- `GET /api/v1/events` — 50 newest events (Bearer auth)
+- `GET /api/v1/stats` — `{count, avg_latency_ms, by_language, requests_non_cancelled, acceptance_rate}`
+- LiveView UI (no auth, dev tool): `/events` (searchable log + per-request reconciliation) and `/stats` (count + acceptance cards)
 
-Events are stored in-memory, capped at 500, newest-first. Phoenix restart wipes them.
+Events persist in Postgres (`docker-compose.yml` at repo root — `docker compose up -d`, DB `telemetry`@localhost:5432, named volume keeps them across runs). Full-text search over prompt/response via a generated `tsvector` column.
 
 ## Learn more
 
 - Each component has its own README: [`extension/README.md`](./extension/README.md), [`sidecar/README.md`](./sidecar/README.md), [`telemetry/README.md`](./telemetry/README.md).
-- Full contract: [`protocol/README.md`](./protocol/README.md) (frozen v1.2).
+- Full contract: [`protocol/README.md`](./protocol/README.md) (frozen v1.3).
 - Architecture map with file-level diagram: [`docs/architecture.md`](./docs/architecture.md).
 - Sidecar dispatch + request pipeline flowcharts: [`docs/sidecar-flow.md`](./docs/sidecar-flow.md).
 

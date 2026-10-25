@@ -37,12 +37,22 @@ defmodule Complete.MixProject do
   defp deps do
     [
       {:phoenix, "~> 1.7"},
+      {:phoenix_ecto, "~> 4.5"},
+      {:ecto_sql, "~> 3.12"},
+      {:postgrex, ">= 0.0.0"},
       {:bandit, "~> 1.5"},
-      {:jason, "~> 1.4"}
+      {:jason, "~> 1.4"},
+      {:phoenix_live_view, "~> 1.0"},
+      {:lazy_html, ">= 0.1.0", only: :test}
     ]
   end
 
   defp aliases do
-    [setup: ["deps.get"]]
+    [
+      setup: ["deps.get", "ecto.setup"],
+      "ecto.setup": ["ecto.create", "ecto.migrate"],
+      "ecto.reset": ["ecto.drop", "ecto.setup"],
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
+    ]
   end
 end

@@ -9,6 +9,7 @@ import { spawn, ChildProcess } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { encodeMessage, FrameDecoder } from "./framing";
+import { configureTelemetry, emitOutcome } from "./telemetry";
 
 const REQUEST_TIMEOUT_MS = 8000;
 
@@ -207,7 +208,21 @@ async function provideInlineCompletionItems(
   token: vscode.CancellationToken
 ): Promise<vscode.InlineCompletionItem[]> {
   if (!child || !isSupported(doc)) return [];
-  // placeholder: real impl sends `completion/cancel` when `token` fires.
+  const language = languageFor(doc);
+  const filePath = vscode.workspace.asRelativePath(doc.uri);
+  const modelUrl = config().get<string>("modelUrl") || undefined;
+  // The JSON-RPC id of this in-flight request — captured for the cancellation
+  // closure below (the sidecar's telemetry request_id only exists once the
+  // response arrives, so a cancel can't correlate to it; see the comment at
+  // emitOutcome for why that's fine).
+  const rpcId = nextId;
+  let settled = false;
+  token.onCancellationRequested(() => {
+    if (settled) return;
+    settled = true;
+    sendNotification("completion/cancel", { request_id: rpcId });
+    emitOutcome("cancelled", `req-ext-${rpcId}`, language, filePath, modelUrl);
+  });
   try {
     const lineText = doc.lineAt(position.line).text;
     const charByte = lineCharToUtf8ByteOffset(lineText, position.character);
@@ -215,20 +230,55 @@ async function provideInlineCompletionItems(
       document_uri: doc.uri.toString(),
       document_version: doc.version,
       position: { line: position.line, character: charByte },
-    })) as { text: string };
+    })) as { text: string; request_id?: string };
+    settled = true;
     output.appendLine(`completion: ${result.text.length} chars`);
     if (token.isCancellationRequested) return [];
     // placeholder: real impl discards if doc.version has moved on.
-    return [new vscode.InlineCompletionItem(result.text, new vscode.Range(position, position))];
+    const item = new vscode.InlineCompletionItem(
+      result.text,
+      new vscode.Range(position, position)
+    );
+    if (result.request_id) {
+      // Fired by VS Code when the user accepts the ghost text (Tab).
+      item.command = {
+        command: "completion.accepted",
+        title: "",
+        arguments: [result.request_id, language, filePath],
+      };
+    }
+    return [item];
   } catch {
     return []; // never block typing on backend trouble
   }
+}
+
+// VS Code fires this when the user accepts an inline completion (Tab). Event
+// carries the sidecar's request_id so Phoenix can reconcile it with the
+// sidecar's own requested/served events for the same request.
+function onAccepted(
+  requestId: string,
+  language: string,
+  filePath: string
+): void {
+  const modelUrl = config().get<string>("modelUrl") || undefined;
+  output.appendLine(`accepted: ${requestId} (${language}, ${filePath})`);
+  output.appendLine(
+    `  telemetry url configured: ${config().get<string>("telemetryUrl") ? "yes" : "NO — accepted event dropped"}`
+  );
+  emitOutcome("accepted", requestId, language, filePath, modelUrl);
 }
 
 // Activation entry point (runs when first file of a supported language opens).
 export function activate(context: vscode.ExtensionContext) {
   output = vscode.window.createOutputChannel("Completion Sidecar");
   context.subscriptions.push(output);
+
+  const cfg = config();
+  configureTelemetry(
+    cfg.get<string>("telemetryUrl") ?? "",
+    cfg.get<string>("telemetryApiKey") ?? ""
+  );
 
   if (spawnSidecar(context)) {
     initializeAndSync().catch((e) => output.appendLine(`initialize failed: ${e}`));
@@ -240,6 +290,7 @@ export function activate(context: vscode.ExtensionContext) {
   }));
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("completion.accepted", onAccepted),
     vscode.workspace.onDidOpenTextDocument(syncOpen),
     vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.contentChanges.length > 0) syncChange(e.document);

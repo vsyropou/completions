@@ -10,16 +10,13 @@ MODEL_PORT ?= 8000
 LLAMA_CACHE ?= $(HOME)/.cache/huggingface
 MODEL_LOG ?= /tmp/llama-server-$(MODEL_PORT).log
 
-.PHONY: compile
+# extention targets
+# .PHONY: compile
 compile:
 	cd extension && npm run compile
 	cargo build --release --manifest-path sidecar/Cargo.toml
 	mkdir -p extension/bin
 	cp sidecar/target/release/sidecar extension/bin/
-
-.PHONY: compile-telemetry
-compile-telemetry:
-	cd telemetry && mix deps.get && mix compile
 
 .PHONY: package
 package: compile
@@ -52,6 +49,12 @@ sidecar-lint-fix:
 		--fix --allow-dirty --allow-staged \
 		-- -D warnings -W missing_docs
 
+# telemetry targets
+.PHONY: compile-telemetry
+compile-telemetry:
+	cd telemetry && mix deps.get && mix compile
+
+# model targets
 .PHONY: model
 model:
 	@command -v llama-server >/dev/null || { echo "llama-server not found. brew install llama.cpp"; exit 1; }
@@ -82,7 +85,3 @@ model-stop:
 .PHONY: model-logs
 model-logs:
 	@tail -f "$(MODEL_LOG)"
-
-.PHONY: model-listeners
-model-listeners:
-	@lsof -i :$(MODEL_PORT) -sTCP:LISTEN -n -P 2>/dev/null | tail -n +2 | awk '{print $$1, $$2}' || echo "no llama-server on port $(MODEL_PORT)"

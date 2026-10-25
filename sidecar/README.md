@@ -101,7 +101,7 @@ cargo build
 Integration tests in [`tests/`](./tests/) mirror `src/`:
 
 ```sh
-cargo test                             # full suite
+cargo test
 ```
 
 ## Lint and format
@@ -112,6 +112,8 @@ Ruff-style targets on the workspace [`Makefile`](../Makefile). Run from the repo
 make sidecar-lint       # report only — clippy + missing_docs
 make sidecar-lint-fix   # clippy --fix + cargo fmt
 ```
+
+## Run
 
 Standalone, the binary sits silently on stdin. Drive it with a framed `printf`
 chain — initialize, two `didOpen`, one `completion/request`, one `shutdown`.

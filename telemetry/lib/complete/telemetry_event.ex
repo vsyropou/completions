@@ -1,11 +1,11 @@
 defmodule Complete.TelemetryEvent do
-  @moduledoc """
-  Persisted telemetry event posted by the sidecar.
-  """
+  @moduledoc "Persisted telemetry event posted by the sidecar."
+
   use Ecto.Schema
   import Ecto.Changeset
 
   @outcomes ~w(requested served superseded accepted cancelled error)
+  @fields ~w(request_id language file_path prompt response latency_ms provider model finish_reason outcome)a
 
   schema "telemetry_events" do
     field(:request_id, :string)
@@ -22,31 +22,27 @@ defmodule Complete.TelemetryEvent do
     field(:inserted_at, :utc_datetime_usec)
   end
 
-  # Non-served outcomes (requested/superseded/accepted/cancelled/error) send
-  # `""` for prompt/response/model/finish_reason. Those columns are nullable
-  # Postgres-side (migration AllowEmptyOutcomeSentinels) and presence-as-binary
-  # is already enforced at the controller; the changeset keeps only outcome.
+  # Wire contract: all fields present. `""` is a valid "not applicable"
+  # sentinel for prompt/response/model/finish_reason on non-served
+  # outcomes — disable Ecto's ""-to-nil coercion per-field so `""`
+  # survives to DB.
   def changeset(event, attrs) do
-    # `empty_strings_to_null` is a schema-level default in Ecto 3.13+: we
-    # disable it module-locally (see @empty_strings_to_null above) so `""`
-    # survives `cast` -> DB. `validate_required([])` is kept minimal on
-    # purpose: `""` for prompt/response/model/finish_reason is a valid
-    # "not applicable" value for non-served outcomes, and presence-as-binary
-    # is already enforced in the controller upstream.
-    event
-    |> cast(attrs, [
-      :request_id,
-      :language,
-      :file_path,
-      :prompt,
-      :response,
-      :latency_ms,
-      :provider,
-      :model,
-      :finish_reason,
-      :outcome
-    ])
-    |> validate_required([:request_id, :outcome])
-    |> validate_inclusion(:outcome, @outcomes)
+    cs =
+      event
+      |> cast(attrs, @fields, empty_values: [])
+      |> require_present(@fields)
+      |> validate_number(:latency_ms, greater_than_or_equal_to: 0)
+      |> validate_inclusion(:outcome, @outcomes)
+
+    cs
+  end
+
+  # All @fields must be present; nil (unlike "") is a contract violation.
+  defp require_present(changeset, fields) do
+    Enum.reduce(fields, changeset, fn field, acc ->
+      if is_nil(get_field(acc, field)),
+        do: add_error(acc, field, "can't be nil", validation: :required),
+        else: acc
+    end)
   end
 end

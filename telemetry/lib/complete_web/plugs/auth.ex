@@ -1,24 +1,17 @@
 defmodule CompleteWeb.Plugs.Auth do
-  @moduledoc """
-  Bearer-token auth (protocol v1.0 §5). Single shared token from config.
-  """
+  @moduledoc "Bearer-token auth (protocol v1.0 §5). Single shared token from config."
 
+  @behaviour Plug
   import Plug.Conn
 
-  @doc "Stores options (none used; kept for Plug behaviour conformance)."
   def init(opts), do: opts
 
-  @doc """
-  Compares `Authorization: Bearer <token>` against the configured
-  `:complete, :auth_token`. Halts with 401 and the protocol error shape
-  on mismatch or missing header; otherwise passes the conn through.
-  """
   def call(conn, _opts) do
     expected = Application.fetch_env!(:complete, :auth_token)
 
     case get_req_header(conn, "authorization") do
       ["Bearer " <> token] ->
-        if secure_compare(token, expected) do
+        if Plug.Crypto.secure_compare(token, expected) do
           conn
         else
           reject(conn, "invalid bearer token")
@@ -28,12 +21,6 @@ defmodule CompleteWeb.Plugs.Auth do
         reject(conn, "missing bearer token")
     end
   end
-
-  # Constant-time compare to avoid token-length/byte timing leaks.
-  defp secure_compare(a, b) when byte_size(a) == byte_size(b),
-    do: Plug.Crypto.secure_compare(a, b)
-
-  defp secure_compare(_, _), do: false
 
   defp reject(conn, message) do
     conn

@@ -83,11 +83,7 @@ defmodule Complete.Telemetry do
     Repo.aggregate(TelemetryEvent, :count)
   end
 
-  @doc """
-  Acceptance rate as a percentage (0.0–100.0): distinct request_ids with an
-  `accepted` event divided by distinct request_ids with a `served` event.
-  COALESCE-safe: 0.0 when no served requests.
-  """
+  @doc "Acceptance rate as a percentage (0.0–100.0): distinct request_ids with an `accepted` event over distinct request_ids with a `served` event."
   def acceptance_rate do
     accepted =
       TelemetryEvent
@@ -101,11 +97,7 @@ defmodule Complete.Telemetry do
       |> select([e], count(e.request_id, :distinct))
       |> Repo.one()
 
-    if served == 0 do
-      0.0
-    else
-      Float.round(accepted / served * 100.0, 2)
-    end
+    if served == 0, do: 0.0, else: Float.round(accepted / served * 100.0, 2)
   end
 
   @doc "Average latency in ms, 0.0 when empty."

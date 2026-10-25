@@ -5,7 +5,11 @@ defmodule CompleteWeb.Router do
   unauthenticated dev LiveView UI (intentionally open — local tooling,
   not production traffic).
   """
-  use CompleteWeb, :router
+  use Phoenix.Router, helpers: false
+
+  import Plug.Conn
+  import Phoenix.Controller
+  import Phoenix.LiveView.Router
 
   pipeline :api do
     plug :accepts, ["json"]
@@ -33,7 +37,6 @@ defmodule CompleteWeb.Router do
 
     live_session :telemetry do
       live "/events", EventIndexLive, :index
-      live "/stats", StatsLive, :index
     end
   end
 end

@@ -1,6 +1,6 @@
 defmodule CompleteWeb.EventIndexLive do
-  @moduledoc "Events browser: filter, paginate, reconcile by request_id."
-  use CompleteWeb, :live_view
+  @moduledoc "Events browser: stats cards up top, filter/paginate/reconcile below."
+  use Phoenix.LiveView, layout: false
 
   alias Complete.Telemetry
 
@@ -19,7 +19,8 @@ defmodule CompleteWeb.EventIndexLive do
        languages: Telemetry.distinct_languages(),
        offset: 0,
        page_size: @page
-     )}
+     )
+     |> refresh_stats()}
   end
 
   @impl true
@@ -54,28 +55,38 @@ defmodule CompleteWeb.EventIndexLive do
     {:noreply, socket |> assign(offset: offset) |> reload()}
   end
 
+  def handle_event("refresh", _params, socket) do
+    {:noreply, socket |> refresh_stats() |> reload()}
+  end
+
+  defp refresh_stats(socket) do
+    assign(socket,
+      requests_non_cancelled: Telemetry.count_non_cancelled(),
+      acceptance_rate: Telemetry.acceptance_rate(),
+      by_language: Telemetry.by_language()
+    )
+  end
+
   defp reload(socket) do
-    # If request_id reconciliation is active, by_request_id already holds the
-    # full ordered lifecycle — next/prev don't apply.
     if socket.assigns.request_id do
       assign(socket, events: Telemetry.by_request_id(socket.assigns.request_id))
     else
       opts =
         [
-          q: nilify(socket.assigns.q),
-          language: nilify(socket.assigns.language),
-          outcome: nilify(socket.assigns.outcome),
+          q: nullify(socket.assigns.q),
+          language: nullify(socket.assigns.language),
+          outcome: nullify(socket.assigns.outcome),
           limit: @page,
           offset: socket.assigns.offset
         ]
-        |> Enum.filter(fn {_k, v} -> not is_nil(v) end)
+        |> Enum.reject(&(elem(&1, 1) == nil))
 
       assign(socket, events: Telemetry.search_events(opts))
     end
   end
 
-  defp nilify(""), do: nil
-  defp nilify(s) when is_binary(s), do: s
+  defp nullify(""), do: nil
+  defp nullify(s) when is_binary(s), do: s
 
   defp tag_class("requested"), do: "tag tag-requested"
   defp tag_class("served"), do: "tag tag-served"
@@ -88,7 +99,28 @@ defmodule CompleteWeb.EventIndexLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <h1>Telemetry events</h1>
+    <h1>Telemetry</h1>
+
+    <div class="cards">
+      <div class="card">
+        <div class="label">Non-cancelled requests</div>
+        <div class="big"><%= @requests_non_cancelled %></div>
+      </div>
+      <div class="card">
+        <div class="label">Acceptance rate</div>
+        <div class="big"><%= @acceptance_rate %>%</div>
+        <div class="bar">
+          <div class="fill" style={"width: #{min(@acceptance_rate, 100.0)}%;"}></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="label">By language</div>
+        <div :for={{lang, n} <- Enum.sort_by(@by_language, &elem(&1, 1), :desc)}>
+          <%= lang %>: <%= n %>
+        </div>
+      </div>
+      <button phx-click="refresh">↻ refresh stats</button>
+    </div>
 
     <form phx-submit="filter" class="filter">
       <input type="text" name="q" value={@q} placeholder="search prompt/response…" />

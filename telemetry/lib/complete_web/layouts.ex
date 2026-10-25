@@ -39,7 +39,7 @@ defmodule CompleteWeb.Layouts do
         </style>
       </head>
       <body>
-        <nav><a href="/events">Events</a><a href="/stats">Stats</a></nav>
+        <nav><a href="/events">Events</a></nav>
         <%= @inner_content %>
       </body>
     </html>

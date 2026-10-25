@@ -58,7 +58,7 @@ compile: ## tsc + cargo build, stage the sidecar binary
 .PHONY: package
 package: compile ## build the .vsix
 	$(INFO) packaging
-	cd extension && npx @vscode/vsce package
+	cd extension && npx @vscode/vsce package --skip-license --allow-missing-repository
 	$(OK) packaged
 
 .PHONY: install

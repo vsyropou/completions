@@ -49,7 +49,6 @@ Notifications (no response): `textDocument/didOpen`, `textDocument/didChange`, `
     "workspace_root": "file:///repo",
     "telemetry_url": "http://localhost:4000",
     "telemetry_api_key": "dev-token",
-    "measure_latency": false,
     "model_url": "",
     "model_api_key": "",
     "model": "",
@@ -66,7 +65,7 @@ Response:
 {
   "jsonrpc": "2.0",
   "id": 1,
-  "result": { "capabilities": { "languages": ["typescript", "tsx"...] } }
+  "result": {}
 }
 ```
 
@@ -165,6 +164,14 @@ Error codes:
 | -32002 | upstream (Phoenix) error                  |
 | -32003 | cancelled                                 |
 
+#### Debounce
+
+`completion/request` is debounced per-URI at **200 ms**, latest-wins. A later
+request on the same URI supersedes the earlier one, which fails with `-32003`.
+Clients must already handle `-32003` from `completion/cancel`, so the behavior
+falls out of the error contract — but on a fast typist every intermediate
+request will end up superseded, never served.
+
 #### `completion/cancel` — notification
 
 ```json
@@ -175,7 +182,10 @@ Error codes:
 }
 ```
 
-The `request_id` equals the JSON-RPC `id` of the `completion/request` to cancel. Cancellation is best-effort: the extension **must** discard stale responses even if cancellation arrives late.
+The `request_id` in `completion/cancel` params equals the JSON-RPC `id` of the
+`completion/request` to cancel — **not** the sidecar-minted `req-N` echoed in
+the response. Those are two different identifiers that share a name.
+Cancellation is best-effort: the extension **must** discard stale responses even if cancellation arrives late.
 
 #### `shutdown` — request
 

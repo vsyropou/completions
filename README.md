@@ -63,9 +63,20 @@ make clean          # drop staged artifacts
 If you reached this point you are now ready to plug in your model by either navigating to vscode extension settings or editing the user `settings.json` file.
 
 ```json
-"completion.modelUrl": <model base url>,  e.g.: "http://127.0.0.1:8000"
-"completion.model": <your model> e.g.:"qwen2.5-coder-1.5b-instruct"
+"completion.modelUrl": <model base url>,  e.g.: "http://127.0.0.1:8000",
+"completion.model": <your model> e.g.:"qwen2.5-coder-1.5b-instruct",
+"completion.fimTemplate": <completion prompt tmplate>, # see below
 ```
+
+### Fim Template
+
+Models have different code completion templates. The extension's default is:
+
+```sh
+"<\|fim_prefix\|>{prefix}<\|fim_suffix\|>{suffix}<\|fim_middle\|>"
+```
+
+For other model templates see the [FIM templates per model](./extension/README.md#fim-templates-per-model).
 
 ### Host a huggingface model locally with llama.cpp
 

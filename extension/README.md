@@ -10,10 +10,10 @@ tsconfig.json      # compiled output to out/
 src/
   extension.ts     # activation, child-process spawn, JSON-RPC client, document sync
   framing.ts       # Content-Length header encode/decode (LSP-style)
+  telemetry.ts     # fire-and-forget POST of `accepted`/`cancelled` outcomes
 out/               # tsc output (not committed)
+bin/               # staged sidecar binary (created by `make compile`)
 ```
-
-(Every file listed lives in this directory — see [`package.json`](./package.json), [`tsconfig.json`](./tsconfig.json), [`src/extension.ts`](./src/extension.ts), [`src/framing.ts`](./src/framing.ts).)
 
 ## Build and run
 
@@ -22,29 +22,36 @@ npm install
 npm run compile    # tsc → out/
 ```
 
-Manual loop:
-1. Build the sidecar first: `cd ../sidecar && cargo build`.
-2. Open this directory (`extension/`) in VS Code.
-3. Press F5 → Extension Development Host.
-4. In the **dev host's** settings, set `completion.sidecarPath` to `…/sidecar/target/debug/sidecar`.
-5. Open a source file in the dev host — ghost text appears within a keystroke.
-
 ## Settings
 
-User-facing, all under the `completion.*` prefix:
+User-facing:
 
-| Setting                     | Default                                          | Used for                               |
-|-----------------------------|--------------------------------------------------|----------------------------------------|
-| `completion.sidecarPath`       | `""` (auto)                                      | Override the sidecar binary path       |
-| `completion.telemetryUrl`      | `http://localhost:4000`                          | Telemetry sink URL (empty = disabled)  |
-| `completion.telemetryApiKey`   | `dev-token`                                      | Bearer to telemetry sink               |
-| `completion.measureLatency`    | `false`                                          | Late-time logs to Output channel       |
-| `completion.modelUrl`          | `""`                                             | Inference base URL; empty → mock       |
-| `completion.modelApiKey`       | `""`                                             | Bearer to inference                    |
-| `completion.model`             | `""`                                             | Model id                               |
-| `completion.fimTemplate`       | Starcoder chain template                         | `{prefix}`/`{suffix}` FIM template     |
+| Setting                      | Example Value                                                      | Used for                              |
+| ---------------------------- | ------------------------------------------------------------------ | ------------------------------------- |
+| `completion.modelUrl`        | `http://localhost:8000`                                            | Inference base URL; empty → mock      |
+| `completion.modelApiKey`     | `<your api key here>`                                              | Bearer to inference; empty -> no auth |
+| `completion.model`           | `""`                                                               | Model id; empty = server decides      |
+| `completion.sidecarPath`     | Optiona - dev only): `""`                                          | Override the sidecar binary path      |
+| `completion.telemetryUrl`    | Optional: `http://localhost:4000`                                  | Telemetry sink URL (empty = disabled) |
+| `completion.telemetryApiKey` | Optional: `""`                                                     | Bearer to telemetry sink              |
+| `completion.fimTemplate`     | `<\|fim_prefix\|>{prefix}<\|fim_suffix\|>{suffix}<\|fim_middle\|>` | `{prefix}`/`{suffix}` FIM template    |
+| `completion.temperature`     | `0.0`                                                              | Sampling temperature                  |
+| `completion.maxTokens`       | `32`                                                               | Output token cap                      |
 
-All four `model*`/`fimTemplate` settings plus `telemetryUrl`/`telemetryApiKey`/`measureLatency` flow through `initialize` to the sidecar's `Config`. Nothing else about them is needed here — the extension doesn't see the prompts or responses.
+### FIM templates per model
+
+Swapping `completion.model` often means swapping `completion.fimTemplate` too — each model family is trained on different FIM marker tokens. Copy the matching row:
+
+| Model                      | `completion.fimTemplate` value                                                            | Notes                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| Qwen2.5-Coder (any size)   | `<\|fim_prefix\|>{prefix}<\|fim_suffix\|>{suffix}<\|fim_middle\|>`                          | Sidecar default; also llama.cpp's preset FIM models |
+| DeepSeek-Coder-V2 / V3     | `<｜fim▁begin｜>{prefix}<｜fim▁hole｜>{suffix}<｜fim▁end｜>`                                   | Full-width bars (`｜`) and `▁`; copy verbatim   |
+| StarCoder2 (3b/7b/15b)     | `<fim_prefix>{prefix}<fim_suffix>{suffix}<fim_middle>`                                      | No `\|` wrappers around the tags                 |
+| CodeLlama                  | `<PRE>{prefix}<SUF>{suffix}<MID>`                                                           |                                                  |
+| GLM-4.5 / GLM-5            | raw FIM not supported                                                                       | Chat-format only — skip for completions          |
+| Granite Code               | raw FIM not supported                                                                       | Instruct-only — skip for completions             |
+
+When in doubt, check `added_tokens_decoder` in the model's `tokenizer_config.json` for the exact FIM token spelling.
 
 ## Activation
 
@@ -52,5 +59,5 @@ The extension registers an explicit per-language activation list — see [`packa
 
 ## Docs
 
-- Wire protocol: [`../protocol/README.md`](../protocol/README.md) (frozen v1.2).
+- Wire protocol: [`../protocol/README.md`](../protocol/README.md).
 - Overall architecture: [`../docs/architecture.md`](../docs/architecture.md).

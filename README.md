@@ -128,6 +128,8 @@ Interact a bit with the completions in vscode and then navigate to [localhost:40
 
 ## Contributing
 
+As already mentioned in the beginning this is a learning exercise that resulted in building the end to end flow of code completions. The interesting part is tweaking the index and context assembly to optimize for completions quality. This is where I will focus my efforts. Any comments, gotchas, critics or contributions are more than welcome.
+
 ## Acknowledgements
 
 The completion architecture (FIM prompting, editor-side context collection) was inspired by [Zed](https://github.com/zed-industries/zed)'s edit-prediction code (GPL-3.0-or-later). No source was copied; implementations here are independent.

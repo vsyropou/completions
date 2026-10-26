@@ -27,8 +27,7 @@ The HTTP API is behind Bearer auth (`AUTH_TOKEN` env, default `dev-token`); the 
 - `POST /api/v1/events` — store one event. `202 {}` / `400`.
 - `GET  /api/v1/events` — `{"events": [ ... 50 newest ... ]}` newest-first.
 - `GET  /api/v1/stats` — `{"count", "avg_latency_ms", "by_language", "requests_non_cancelled", "acceptance_rate"}`.
-- `GET  /events` — LiveView: search/filter raw events, per-request_id reconciliation view.
-- `GET  /stats` — LiveView: the two aggregation cards (non-cancelled count, accepted %) + by-language table.
+- `GET  /events` — LiveView: search/filter raw events and stats.
 
 Event body (emitted by both `sidecar/src/telemetry.rs` and `extension/src/telemetry.ts`):
 
@@ -54,16 +53,12 @@ One logical request yields several events correlated by `request_id` — the sid
 ```sh
 docker compose up -d    # postgres:18 from the repo-root compose file
 mix setup               # deps.get + ecto.create + ecto.migrate
+mix compile
 mix phx.server          # :4000 — UI at /events and /stats
-mix test                # sandbox tests (auto-create+migrate telemetry_test)
 ```
 
-## Storage
+## Testing
 
-`telemetry_events` in Postgres (`telemetry` db, complete/complete creds, localhost:5432 from the repo-root `docker-compose.yml`). A stored generated `tsvector` column over `prompt || ' ' || response` with a GIN index backs full-text search; the two metric queries are plain `COUNT DISTINCT request_id` aggregates. Persistence across restarts is the docker `postgres_data` named volume.
-
-## Config
-
-- `AUTH_TOKEN` (default `dev-token`) — Bearer auth for the HTTP API.
-- `DATABASE_URL` (prod only) — overrides the dev-hardcoded `postgres://complete:complete@localhost/telemetry`.
-- No `INFERENCE_*` — inference params live in VS Code settings and flow into the sidecar's `Config`.
+```sh
+mix test                # sandbox tests (auto-create+migrate telemetry_test)
+```

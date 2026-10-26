@@ -1,6 +1,4 @@
-# Completion Protocol — FROZEN v1
-
-Contract version: **v1.3** (frozen 2026-10-25). No field renames, endpoint changes, or coordinate changes without lead approval and a version bump.
+# Communication Protocol
 
 Wire format follows the [JSON-RPC 2.0 specification](https://www.jsonrpc.org/specification), with [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#headerPart) style framing (`Content-Length: N\r\n\r\n` + UTF-8 JSON body).
 
@@ -16,7 +14,8 @@ VS Code <--JSON-RPC 2.0 over stdio--> Rust sidecar --HTTP/JSON--> Inference
   **UTF-8 byte offset** within the line. The extension converts from VS
   Code's native UTF-16 before send.
 - Document `version` is an integer, **monotonically increasing** per document.
-- `request_id` for each request is a monotonically-increasing, sidecar-minted string (`"req-N"`, per-process). It is minted when `completion/request` passes validation and is echoed back in the response. All telemetry events for that request — sidecar-emitted (`requested`/`served`/`superseded`/`error`) and extension-emitted (`accepted`/`cancelled`, POSTed directly to the telemetry sink) — are correlated by this id.
+- `request_id` for each request is a monotonically-increasing, sidecar-minted string (`"req-N"`, per-process). It is minted when `completion/request` passes validation and is echoed back in the response.
+- All telemetry events for that request — sidecar-emitted (`requested`/`served`/`superseded`/`error`) and extension-emitted (`accepted`/`cancelled`, POSTed directly to the telemetry sink) — are correlated by `request_id`.
 
 ---
 
@@ -156,15 +155,15 @@ Error response (JSON-RPC standard error object):
 
 Error codes:
 
-| code | meaning |
-|---|---|
-| -32700 | parse error |
-| -32601 | unknown method |
-| -32602 | invalid params |
-| -32000 | unknown document |
+| code   | meaning                                   |
+| ------ | ----------------------------------------- |
+| -32700 | parse error                               |
+| -32601 | unknown method                            |
+| -32602 | invalid params                            |
+| -32000 | unknown document                          |
 | -32001 | document version mismatch / stale request |
-| -32002 | upstream (Phoenix) error |
-| -32003 | cancelled |
+| -32002 | upstream (Phoenix) error                  |
+| -32003 | cancelled                                 |
 
 #### `completion/cancel` — notification
 
@@ -231,15 +230,14 @@ Event body (all fields required; "outcome" ∈ `requested` | `served` | `superse
 ## 4. Coordinates and versions
 
 - `position.line`: zero-based line.
-- `position.character`: zero-based **UTF-8 byte offset** within the line. The extension is responsible for converting the editor's native position (UTF-16 code units in VS Code and JetBrains) into bytes before send. Any client that emits something else (code points, byte offsets from the doc start, etc.) must do the same.
+- `position.character`: zero-based **UTF-8 byte offset** within the line. The extension is responsible for converting the editor's native position (UTF-16 code units in VS Code and JetBrains) into bytes before send.
 - A completion response is valid only if `document_version` in the response equals the document's current version in the extension. Otherwise the extension discards it.
 
 ---
 
 ## 5. Authentication
 
-- Phoenix validates the `Authorization: Bearer <token>` header against a token from config (`AUTH_TOKEN` env).
-- MVP = a single shared token. No user database.
+Phoenix validates the `Authorization: Bearer <token>` header against a token from config (`AUTH_TOKEN` env).
 
 ---
 
@@ -252,4 +250,4 @@ Event body (all fields required; "outcome" ∈ `requested` | `served` | `superse
 
 ---
 
-*End of frozen contract v1.3.*
+_End of frozen contract v1.3._

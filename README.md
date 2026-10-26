@@ -8,7 +8,7 @@ This repo is for you if:
 - You really appriciate zed's `"bring your own model approach"` to their ide.
 - You like to host models yourself.
 - You want ai code completions when no internet connection is available.
-- You value the `Retrieve` part in RAG much more than the Generation.
+- You value the `Retrieve` part in RAG much more than the `Generation`.
 - You like to learn while building and breaking stuff.
 
 Repo layout:
@@ -27,37 +27,78 @@ The Rust sidecar does the smart work — prompt assembly (FIM), repo context, cu
 ├─ [`protocol/README.md`](./protocol/README.md) — frozen v1.3 contract for extension↔sidecar  
 ├─ docs - [`arhitecture`](./docs/architecture.md) and [`index`](./docs/architecture.md) documentation
 
-## Install and Run
+## Installation
+
+The app has several dependencies.
+
+Vscode extension packaging.
 
 ```sh
 npm install -g @vscode/vsce   # or: brew install vsce
 ```
 
-The top-level [`Makefile`](./Makefile) builds the release sidecar, compiles the extension, stages everything, and installs the `.vsix` into VS Code:
+Rust build and packaging [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html).
 
 ```sh
-make compile        # release sidecar + extension compile, stages extension/bin/sidecar
-make package        # produce extension/completion-<version>.vsix via vsce
-make install        # code --install-extension extension/completion-<version>.vsix
+curl https://sh.rustup.rs -sSf | sh
+```
+
+Elixir for the telemetry app you can quickly follow the official [guide](https://elixir-lang.org/install/) or use [asdf](https://asdf-vm.com/) to manage [multiple](https://elixir-lang.org/install/#version-managers) tool versions.
+
+Once all the dependencies are installed. The top-level [`Makefile`](./Makefile) builds the release sidecar, compiles the extension, stages everything, and installs the `.vsix` into VS Code:
+
+```sh
+make install        # builds sidecar, extension, packages and installs the extension.
+```
+
+Cleaning up
+
+```sh
 make uninstall      # code --uninstall-extension vasilis.completion
 make clean          # drop staged artifacts
 ```
 
-`make install` is the equivalent of "ship it" for a single-machine setup; `make package` alone gives you a `.vsix` you can hand to someone else's VS Code (`Extensions: Install from VSIX…`).
+## Bringing your model
 
-## Host a local model with llama.cpp
+If you reached this point you are now ready to plug in your model by either navigating to vscode extension settings or editing the user `settings.json` file.
 
-The sidecar talks to any OpenAI-compatible server on `{model_url}/v1/completions`. The fastest zero-GPU way to bring one up is [`llama.cpp`](https://github.com/ggml-org/llama.cpp) — install it however you like, then use the bundled Makefile targets to run `llama-server`.
+```json
+"completion.modelUrl": <model base url>,  e.g.: "http://127.0.0.1:8000"
+"completion.model": <your model> e.g.:"qwen2.5-coder-1.5b-instruct"
+```
 
-**1. Install `llama.cpp`.** Follow [their install docs](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md) — `brew install llama.cpp`, build from source, or grab a pre-built binary. You need `llama-server` on your `$PATH`.
+### Host a huggingface model locally with llama.cpp
 
-**2. Pull + run with the Makefile.** Defaults host [`bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF`](https://huggingface.co/bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF) (Q4_K_M quantization, ~1 GB download on first pull) on `127.0.0.1:8000`:
+The sidecar talks to any OpenAI-compatible server on `{model_url}/v1/completions`. The fastest zero-GPU way to bring one up is [`llama.cpp`](https://github.com/ggml-org/llama.cpp), seed here for [installation](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md) then use the bundled Makefile targets to run `llama-server`.
+
+**1. Pull a model**
 
 ```sh
-make model-pull          # warm the HF cache; downloads once to ~/.cache/huggingface
+make model-pull HF_REPO=<> HF_FILE=<>
+```
+
+Defaults to:
+
+```sh
+HF_REPO = bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF
+HF_FILE = Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf
+# Other model hosting configurations:
+MODEL_PORT = 8000
+LLAMA_CACHE = $(HOME)/.cache/huggingface
+MODEL_LOG   = /tmp/llama-server-$(MODEL_PORT).log
+```
+
+**2. Serve the model**
+
+```sh
 make model               # start llama-server on port 8000 (Ctrl+C to stop)
-make model-stop          # kill a backgrounded server
+```
+
+See logs and stop
+
+```sh
 make model-logs          # confirm what's listening
+make model-stop          # kill a backgrounded server
 ```
 
 **3. Ping the server** to make sure it's alive and answering prompts:
@@ -65,41 +106,27 @@ make model-logs          # confirm what's listening
 ```sh
 curl http://127.0.0.1:8000/v1/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"qwen2.5-coder-1.5b-instruct","prompt":"def fib(n):","max_tokens":32,"temperature":0}' | jq '.'
+  -d '{"prompt":"def fib(n):"}' | jq '.'
 ```
 
-**4. Point VS Code at it.** In either user settings or in the installed app settings:
+## Telemetry and Statistics (Optional)
 
-```json
-"completion.modelUrl": "http://127.0.0.1:8000",
-"completion.model": "qwen2.5-coder-1.5b-instruct"
-```
-
-`modelApiKey` can stay empty — `llama-server` accepts any bearer (or none). Reload the dev-host window.
-
-**5. Swap the model.** Override the Makefile variables for a different repo/quantization/port:
+Completion requests to sidecar and usage requests are tracked by the [telemetry app](./telemetry/README.md). You can start the service,
 
 ```sh
-make model HF_REPO=bartowski/Qwen2.5-Coder-7B-Instruct-GGUF \
-           HF_FILE=Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf \
-           MODEL_PORT=8001
+docker compose up -d    # postgres:18 from the repo-root compose file
+make telemetry
 ```
 
-## Phoenix telemetry
-
-- `POST /api/v1/events` — sidecar and extension emit outcome-keyed events (`requested`/`served`/`superseded`/`accepted`/`cancelled`/`error`), correlated by `request_id`
-- `GET /api/v1/events` — 50 newest events (Bearer auth)
-- `GET /api/v1/stats` — `{count, avg_latency_ms, by_language, requests_non_cancelled, acceptance_rate}`
-- LiveView UI (no auth, dev tool): `/events` (searchable log + per-request reconciliation) and `/stats` (count + acceptance cards)
-
-Events persist in Postgres (`docker-compose.yml` at repo root — `docker compose up -d`, DB `telemetry`@localhost:5432, named volume keeps them across runs). Full-text search over prompt/response via a generated `tsvector` column.
+Interact a bit with the completions in vscode and then navigate to [localhost:4000](http://localhost:4000/events) —
 
 ## Learn more
 
 - Each component has its own README: [`extension/README.md`](./extension/README.md), [`sidecar/README.md`](./sidecar/README.md), [`telemetry/README.md`](./telemetry/README.md).
-- Full contract: [`protocol/README.md`](./protocol/README.md) (frozen v1.3).
 - Architecture map with file-level diagram: [`docs/architecture.md`](./docs/architecture.md).
 - Sidecar dispatch + request pipeline flowcharts: [`docs/sidecar-flow.md`](./docs/sidecar-flow.md).
+
+## Contributing
 
 ## Acknowledgements
 
